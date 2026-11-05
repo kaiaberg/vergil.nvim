@@ -83,7 +83,7 @@ return {
   end,
   ["command completion"] = function()
     h.eq(require("vergil.commands").complete("t", "Vergil t"), { "toggle" })
-    h.eq(require("vergil.commands").complete("", "Vergil "), { "disable", "enable", "open", "preview", "toggle" })
+    h.eq(require("vergil.commands").complete("", "Vergil "), { "disable", "enable", "open", "preview", "range", "snippet", "toggle" })
     h.eq(require("vergil.commands").complete("v", "Vergil open v"), { "vsplit" })
   end,
 }

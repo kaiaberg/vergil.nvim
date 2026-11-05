@@ -5,11 +5,16 @@ local M = {}
 function M.setup(opts)
   local config = require("vergil.config")
   config.set(opts)
-  -- Re-check open buffers: activation patterns may have changed.
+  -- Re-check open buffers: activation patterns or the preset may have changed.
   local session = require("vergil.session")
+  local keymaps = require("vergil.keymaps")
   for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_loaded(bufnr) then
       session.maybe_enable(bufnr)
+      if session.is_enabled(bufnr) then
+        keymaps.detach(bufnr)
+        keymaps.attach(bufnr)
+      end
     end
   end
 end

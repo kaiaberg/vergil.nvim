@@ -68,6 +68,8 @@ function M.enable(bufnr)
   sessions[bufnr] = session
   vim.b[bufnr].vergil_enabled = true
   require("vergil.lsp.client").attach(bufnr)
+  require("vergil.range").attach(bufnr)
+  require("vergil.keymaps").attach(bufnr)
   vim.api.nvim_exec_autocmds("User", { pattern = "VergilEnable", data = { bufnr = bufnr }, modeline = false })
   return session
 end
@@ -83,6 +85,8 @@ function M.disable(bufnr)
   if vim.api.nvim_buf_is_valid(bufnr) then
     vim.b[bufnr].vergil_enabled = nil
     require("vergil.lsp.client").detach(bufnr)
+    require("vergil.range").detach(bufnr)
+    require("vergil.keymaps").detach(bufnr)
   end
   vim.api.nvim_exec_autocmds("User", { pattern = "VergilDisable", data = { bufnr = bufnr }, modeline = false })
 end

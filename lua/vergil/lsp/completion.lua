@@ -41,8 +41,8 @@ end
 ---@return string[]
 function M.trigger_characters()
   local chars = { ".", "/", '"' }
-  for _, t in pairs(config.options.triggers) do
-    local c = t:sub(-1)
+  for _, k in ipairs({ "attach", "mention" }) do
+    local c = config.options.triggers[k]:sub(-1)
     if not vim.tbl_contains(chars, c) then
       chars[#chars + 1] = c
     end

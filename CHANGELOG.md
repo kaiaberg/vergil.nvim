@@ -24,6 +24,15 @@ All notable changes are documented here. The format follows
 - Hover previews (`K`, `:Vergil preview`) and go-to-definition, plus
   `:Vergil open [split|vsplit|tab]`.
 - `completion.native` to enable Neovim's built-in completion.
+- Line selector: `#` typed right after a reference, or `:Vergil range`, opens
+  a float with a read-only copy of the file. `Enter` inserts a mention, `gs`
+  a verbatim snippet, `gb` both; `q`/`Esc` cancels and removes only the `#`.
+  Keys are configurable under `selector.keys`.
+- `:Vergil snippet [both]` turns a ranged reference in the prompt into its
+  lines (or adds them below), with `<Plug>(vergil-snippet)` and
+  `<Plug>(vergil-snippet-both)`. Without a range it opens the selector.
+- `keymaps.preset = true` maps `gs`/`gb` to those in prompt buffers only;
+  there are no mappings by default.
 
 ### Removed
 

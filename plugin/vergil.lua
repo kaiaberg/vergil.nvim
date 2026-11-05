@@ -34,6 +34,8 @@ for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
   end
 end
 
+require("vergil.keymaps").define_plugs()
+
 vim.api.nvim_create_user_command("Vergil", function(opts)
   require("vergil.commands").run(opts)
 end, {
