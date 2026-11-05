@@ -3,8 +3,9 @@
 A lightweight, Vim-native toolkit for composing prompts for coding agents,
 starting with Claude Code's `Ctrl+G` external editor.
 
-> **Status:** pre-alpha. Milestone 0 (validation) is in progress; nothing is
-> usable yet. See `docs/m0-findings.md`.
+> **Status:** pre-alpha. The reference core exists (`:Vergil toggle` converts
+> between `@path` and `` `path` ``); completion, line selection and the rest
+> are still to come. See `docs/m0-findings.md`.
 
 ## Requirements
 

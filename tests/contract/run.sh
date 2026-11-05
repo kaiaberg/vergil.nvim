@@ -18,6 +18,7 @@ printf 'MARK1_\n' > 'my file.txt'
 printf 'MARK2_\n' > Override
 printf 'MARK3_\n' > ctrl.txt
 printf 'MARK4_\n' > small.txt
+for c in 5 6 7 8 9; do printf "MARK${c}_\n" > "m$c.txt"; done
 python3 - <<'PY'
 line = "filler line of text for size testing 0123456789\n"
 for k in (70, 100, 260):
@@ -51,6 +52,13 @@ check "control @file attaches"                yes "$(yn MARK3_)"
 check "@\"quoted path\" attaches"             yes "$(yn MARK1_)"
 check "@Name inside fenced code attaches"     yes "$(yn MARK2_)"
 check "backtick mention attaches nothing"     no  "$(yn MARK4_)"
+
+send $'Boundary test. Reply OK.\n\n(@m5.txt) and `@m6.txt` and @m7.txt), and @m8.txt... and `see @m9.txt`'
+check "@ after ( is not a reference"          no  "$(yn MARK5_)"
+check "@ after a backtick is not a reference" no  "$(yn MARK6_)"
+check "trailing ), is stripped"               yes "$(yn MARK7_)"
+check "trailing ... is stripped"              yes "$(yn MARK8_)"
+check "trailing backtick is stripped"         yes "$(yn MARK9_)"
 
 for f in sz70 sz100 dense40 sz260; do send "Size test. Reply OK. @$f.txt"; done
 check "70 KB prose attaches"                  yes "$(yn SZ70_)"

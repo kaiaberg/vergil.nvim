@@ -23,6 +23,9 @@ come from transcript markers. Reproduce with `make contract`.
 | What happens at 256 KB or more? | `"unread":"too_large"`; Claude is told to read in portions | As the plan describes |
 | Several large files in one prompt | Each file is judged on its own; files under the limit attach | No total budget was observed |
 | Which editor does `Ctrl+G` run? | **`$VISUAL` before `$EDITOR`**; plain `nvim` is launched as `nvim +1 <file>` | Only wrappers are affected: the real plugin activates inside whichever `nvim` opens. Troubleshooting docs should mention `VISUAL`, and vergil must not rely on the `+1` argument |
+| Which `@` counts as a reference? (M1) | Only at line start or after whitespace (space, tab). `(@a)`, `"@a"`, `` `@a` `` and `x@a` are **not** references | The parser's boundary rule; completion triggers must use the same rule |
+| Trailing punctuation after an unquoted path (M1) | Any run of ``.,;:!?)]}>'"` `` (backtick included) is stripped: `@a.ts),` and `@a.ts...` attach `a.ts` | Spans exclude trailing punctuation, so conversions keep it |
+| `@dir/` (M1) | Lists the directory | Directories are attachments |
 | Temp file name | `/tmp/claude-501/claude-prompt-<uuid>.md` (a UUID, not a hash) | Pattern `claude-prompt-*.md` still fits |
 
 Still open, since they don't affect the grammar: how reliably Claude interprets
