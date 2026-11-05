@@ -1,0 +1,4 @@
+/deps/
+/.tests/
+*.swp
+.DS_Store
