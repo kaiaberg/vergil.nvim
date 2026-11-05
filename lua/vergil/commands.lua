@@ -37,6 +37,24 @@ M.subcommands = {
       notify(err, vim.log.levels.WARN)
     end
   end,
+  submit = function()
+    local ok, err = require("vergil.submit").submit()
+    if not ok then
+      notify(err, vim.log.levels.WARN)
+    end
+  end,
+  abort = function()
+    local ok, err = require("vergil.submit").abort()
+    if not ok then
+      notify(err, vim.log.levels.WARN)
+    end
+  end,
+  pick = function(args)
+    local ok, err = require("vergil.picker").pick(args[1])
+    if not ok then
+      notify(err, vim.log.levels.WARN)
+    end
+  end,
   toggle = function()
     local ok, err = require("vergil").toggle()
     if not ok then
@@ -74,6 +92,11 @@ function M.complete(arglead, cmdline)
     return vim.tbl_filter(function(n)
       return vim.startswith(n, arglead)
     end, { "split", "vsplit", "tab" })
+  end
+  if cmdline:match("^%s*%S+%s+pick%s+%S*$") then
+    return vim.tbl_filter(function(n)
+      return vim.startswith(n, arglead)
+    end, { "attach", "mention", "skills" })
   end
   if cmdline:match("^%s*%S+%s+snippet%s+%S*$") then
     return vim.tbl_filter(function(n)

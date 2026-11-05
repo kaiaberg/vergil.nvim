@@ -16,7 +16,9 @@ local M = {}
 ---@field completion { native: boolean, reopen_on_backspace: boolean }
 ---@field files { command: string[]? } custom discovery command, run in the root
 ---@field keymaps { preset: boolean } opt-in buffer-local mappings in prompt buffers
+---@field picker { backend: "auto"|"telescope"|"select" }
 ---@field return_to_prompt boolean `:q` in a file opened from the prompt returns to the prompt
+---@field diagnostics { attachment_token_warning: integer, severity: table<string, "error"|"warn"|"info"|"hint"|false> }
 
 ---@type vergil.Config
 M.defaults = {
@@ -41,11 +43,31 @@ M.defaults = {
   },
   files = { command = nil },
   -- No mappings by default. `preset = true` maps, in prompt buffers only:
-  -- gs = :Vergil snippet, gb = :Vergil snippet both, <Esc> = close preview.
+  -- gs/gb = snippet (replace/add below), <Esc> = close preview,
+  -- gf/<C-w>f/<C-w>gf = open reference (here/split/tab, else the native key),
+  -- ZZ = :Vergil submit, ZQ = :Vergil abort.
   keymaps = { preset = false },
   -- `:q` in the last window, showing a file opened from the prompt (e.g.
   -- with `gd`), returns to the prompt instead of exiting Neovim.
   return_to_prompt = true,
+  -- Full-size picker: "auto" uses telescope.nvim when installed, else
+  -- vim.ui.select (Enter only).
+  picker = { backend = "auto" },
+  diagnostics = {
+    -- Warn above this many estimated tokens (bytes / 3). Claude Code drops
+    -- larger attachments silently; its limit is near 25k tokens.
+    attachment_token_warning = 20000,
+    -- "error", "warn", "info", "hint", or false to turn a check off.
+    severity = {
+      duplicate = "warn", -- same file attached twice
+      large = "warn", -- attachment above the token threshold
+      range = "warn", -- mention range past the end of the file
+      ignored_range = "hint", -- @file#range: the range doesn't limit it
+      missing_mention = "warn",
+      missing_attachment = "info", -- pasted text may contain @words
+      fenced = "hint", -- @file inside fenced code still gets attached
+    },
+  },
 }
 
 ---@type vergil.Config
@@ -65,6 +87,22 @@ function M.set(opts)
   vim.validate("selector", opts.selector, "table", true)
   vim.validate("keymaps", opts.keymaps, "table", true)
   vim.validate("return_to_prompt", opts.return_to_prompt, "boolean", true)
+  vim.validate("picker", opts.picker, "table", true)
+  if opts.picker and opts.picker.backend ~= nil then
+    vim.validate("picker.backend", opts.picker.backend, function(v)
+      return v == "auto" or v == "telescope" or v == "select"
+    end, '"auto", "telescope" or "select"')
+  end
+  vim.validate("diagnostics", opts.diagnostics, "table", true)
+  if opts.diagnostics then
+    vim.validate("diagnostics.attachment_token_warning", opts.diagnostics.attachment_token_warning, "number", true)
+    vim.validate("diagnostics.severity", opts.diagnostics.severity, "table", true)
+    for kind, sev in pairs(opts.diagnostics.severity or {}) do
+      if not (sev == false or sev == "error" or sev == "warn" or sev == "info" or sev == "hint") then
+        error(("vergil: diagnostics.severity.%s must be error, warn, info, hint or false"):format(kind), 0)
+      end
+    end
+  end
   if opts.triggers and opts.triggers.range ~= nil then
     vim.validate("triggers.range", opts.triggers.range, "string")
     if vim.fn.strchars(opts.triggers.range) ~= 1 or opts.triggers.range:find("%s") then

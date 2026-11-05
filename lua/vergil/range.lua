@@ -191,21 +191,56 @@ end
 ---@return boolean ok
 ---@return string? err
 function M.select_at_cursor()
-  local bufnr = vim.api.nvim_get_current_buf()
+  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+  return M.select_at(vim.api.nvim_get_current_buf(), row - 1, col)
+end
+
+--- The reference at a position in a prompt buffer, its target, and a context.
+local function context_at(bufnr, row, col)
   local session = require("vergil.session").get(bufnr)
+  if not session then
+    return nil, "not enabled in this buffer (use :Vergil enable)"
+  end
+  local ref = parser.at(parser.parse_buffer(bufnr), row, col)
+  if not ref then
+    return nil, "no reference under the cursor"
+  end
+  local target, err = selectable(ref, session.root)
+  if not target then
+    return nil, err
+  end
+  local win = vim.fn.bufwinid(bufnr)
+  return { bufnr = bufnr, win = win ~= -1 and win or vim.api.nvim_get_current_win(), ref = ref, span = ref.span, from_insert = false },
+    target
+end
+
+--- Opens the selector for a file and inserts the result at a position
+--- (used by the picker's `<C-r>`): there is no reference to replace yet.
+---@param opts { bufnr: integer, win: integer, row: integer, col: integer, path: string, from_insert: boolean }
+---@return boolean ok
+---@return string? err
+function M.select_for_path(opts)
+  local session = require("vergil.session").get(opts.bufnr)
   if not session then
     return false, "not enabled in this buffer (use :Vergil enable)"
   end
-  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-  local ref = parser.at(parser.parse_buffer(bufnr), row - 1, col)
-  if not ref then
-    return false, "no reference under the cursor"
-  end
+  local span = { start_row = opts.row, start_col = opts.col, end_row = opts.row, end_col = opts.col }
+  local ref = { mode = "mention", path = opts.path, explicit = true, span = span }
   local target, err = selectable(ref, session.root)
   if not target then
     return false, err
   end
-  local ctx = { bufnr = bufnr, win = vim.api.nvim_get_current_win(), ref = ref, span = ref.span, from_insert = false }
+  return open({ bufnr = opts.bufnr, win = opts.win, ref = ref, span = span, from_insert = opts.from_insert }, target)
+end
+
+--- Opens the selector for the reference at a 0-based position.
+---@return boolean ok
+---@return string? err
+function M.select_at(bufnr, row, col)
+  local ctx, target = context_at(bufnr, row, col)
+  if not ctx then
+    return false, target
+  end
   return open(ctx, target)
 end
 
@@ -216,25 +251,23 @@ end
 ---@return boolean ok
 ---@return string? err
 function M.snippet_at_cursor(action)
+  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+  return M.snippet_at(vim.api.nvim_get_current_buf(), row - 1, col, action)
+end
+
+--- `snippet_at_cursor` for a 0-based position.
+---@return boolean ok
+---@return string? err
+function M.snippet_at(bufnr, row, col, action)
   action = action or "snippet"
   if action ~= "snippet" and action ~= "both" then
     return false, ("unknown snippet mode %q; expected both or nothing"):format(action)
   end
-  local bufnr = vim.api.nvim_get_current_buf()
-  local session = require("vergil.session").get(bufnr)
-  if not session then
-    return false, "not enabled in this buffer (use :Vergil enable)"
+  local ctx, target = context_at(bufnr, row, col)
+  if not ctx then
+    return false, target
   end
-  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-  local ref = parser.at(parser.parse_buffer(bufnr), row - 1, col)
-  if not ref then
-    return false, "no reference under the cursor"
-  end
-  local target, err = selectable(ref, session.root)
-  if not target then
-    return false, err
-  end
-  local ctx = { bufnr = bufnr, win = vim.api.nvim_get_current_win(), ref = ref, span = ref.span, from_insert = false }
+  local ref = ctx.ref
   local range = ref.start_line and { ref.start_line, ref.end_line } or ref.ignored_range
   if not range then
     return open(ctx, target)

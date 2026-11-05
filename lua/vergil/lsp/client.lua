@@ -7,6 +7,28 @@ local M = {}
 
 local group = vim.api.nvim_create_augroup("vergil.lsp", { clear = true })
 
+-- Client-side commands behind code actions (see lsp/code_actions.lua).
+local function command_target(cmd)
+  local uri, row, col = unpack(cmd.arguments or {})
+  return vim.uri_to_bufnr(uri), row, col
+end
+
+vim.lsp.commands["vergil.snippet"] = function(cmd)
+  local bufnr, row, col = command_target(cmd)
+  local ok, err = require("vergil.range").snippet_at(bufnr, row, col, cmd.arguments[4])
+  if not ok then
+    vim.notify("vergil: " .. err, vim.log.levels.WARN)
+  end
+end
+
+vim.lsp.commands["vergil.select"] = function(cmd)
+  local bufnr, row, col = command_target(cmd)
+  local ok, err = require("vergil.range").select_at(bufnr, row, col)
+  if not ok then
+    vim.notify("vergil: " .. err, vim.log.levels.WARN)
+  end
+end
+
 --- Reopens completion after Backspace inside a reference. Engines close the
 --- menu when Backspace deletes a non-keyword character such as `.` or `/`
 --- (blink: completion/trigger/init.lua; native never re-queries on
@@ -97,6 +119,14 @@ function M.attach(bufnr)
   if not vim.b[bufnr].vergil_watching then
     vim.b[bufnr].vergil_watching = true
     watch_backspace(bufnr)
+    -- Targets may have changed while away (e.g. a file edited after `gd`).
+    vim.api.nvim_create_autocmd({ "BufEnter", "FocusGained" }, {
+      group = group,
+      buffer = bufnr,
+      callback = function()
+        server.refresh(bufnr)
+      end,
+    })
   end
   return client_id
 end

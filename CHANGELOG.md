@@ -45,6 +45,22 @@ All notable changes are documented here. The format follows
 - `:q` in a file opened from the prompt (with `gd` or `:Vergil open`) returns
   to the prompt instead of exiting Neovim and handing back to the agent
   (`return_to_prompt`, on by default).
+- Diagnostics: duplicate attachments, large attachments (estimated tokens;
+  Claude Code drops them silently), mention ranges past the end, ignored
+  `@file#range`, missing targets, and fenced `@file` that still gets
+  attached. Severities and the token threshold are configurable.
+- Code actions (`gra`): convert between attachment and mention (as a
+  quickfix for duplicate, large and ranged attachments), replace with
+  snippet, add snippet below, select lines.
+- `:Vergil submit` writes the prompt, asks about other modified buffers
+  and exits; `:Vergil abort` exits with `:cquit` so Claude Code restores
+  the prompt.
+- `:Vergil pick [attach|mention|skills]`: telescope.nvim picker with file
+  previews (`<C-t>` switches type, `<C-r>` selects lines), falling back to
+  `vim.ui.select`.
+- `<Plug>` mappings for every action; the preset adds `gf`, `<C-w>f`,
+  `<C-w>gf`, `ZZ` and `ZQ` in prompt buffers.
+- `:checkhealth vergil`.
 - A YAML-frontmatter subset reader (quoted and block scalars) that never
   breaks completion on malformed files.
 

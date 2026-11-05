@@ -1,9 +1,9 @@
 --- In-process LSP server, started with `vim.lsp.start` and a Lua `cmd`.
 ---
---- The server reads prompt buffers directly instead of tracking document
---- sync: it runs inside the same Neovim, and the buffer is the source of
---- truth (plan §7.3). Positions are byte columns (`positionEncoding = utf-8`),
---- matching the parser's spans.
+--- The server reads prompt buffers directly: it runs inside the same Neovim,
+--- and the buffer is the source of truth (plan §7.3). Document sync is only
+--- used as a signal to revalidate. Positions are byte columns
+--- (`positionEncoding = utf-8`), matching the parser's spans.
 local M = {}
 
 M.name = "vergil"
@@ -33,7 +33,35 @@ local handlers = {
   ["textDocument/definition"] = function(params, session)
     return require("vergil.lsp.definition").handle(params, session)
   end,
+  ["textDocument/codeAction"] = function(params, session)
+    return require("vergil.lsp.code_actions").handle(params, session)
+  end,
 }
+
+--- Running server instances, for pushing diagnostics outside of requests.
+local instances = {} ---@type table<table, vim.lsp.rpc.Dispatchers>
+
+local function publish(dispatchers, uri)
+  local session = require("vergil.session").get(vim.uri_to_bufnr(uri))
+  local diags = {}
+  if session then
+    local ok, res = pcall(require("vergil.lsp.diagnostics").compute, session)
+    diags = ok and res or {}
+  end
+  dispatchers.notification("textDocument/publishDiagnostics", { uri = uri, diagnostics = diags })
+end
+
+--- Revalidates a prompt buffer, e.g. after returning to it.
+---@param bufnr integer
+function M.refresh(bufnr)
+  if not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+  local uri = vim.uri_from_bufnr(bufnr)
+  for _, dispatchers in pairs(instances) do
+    publish(dispatchers, uri)
+  end
+end
 
 --- Handlers that answer through `respond` (possibly later) instead of returning.
 local async = { ["textDocument/completion"] = true }
@@ -41,10 +69,11 @@ local async = { ["textDocument/completion"] = true }
 local function capabilities()
   return {
     positionEncoding = "utf-8",
-    textDocumentSync = { openClose = false, change = 0 },
+    textDocumentSync = { openClose = true, change = 1 },
     completionProvider = { triggerCharacters = require("vergil.lsp.completion").trigger_characters() },
     hoverProvider = true,
     definitionProvider = true,
+    codeActionProvider = { codeActionKinds = { "quickfix", "refactor.rewrite" } },
   }
 end
 
@@ -57,6 +86,7 @@ function M.cmd(dispatchers)
   local pending = {} ---@type table<integer, fun(err: table?, result: any)>
 
   local srv = {}
+  instances[srv] = dispatchers
 
   function srv.request(method, params, callback)
     next_id = next_id + 1
@@ -102,8 +132,18 @@ function M.cmd(dispatchers)
   function srv.notify(method, params)
     if method == "$/cancelRequest" and params and pending[params.id] then
       pending[params.id]({ code = ERR_CANCELLED, message = "cancelled" }, nil)
+    elseif method == "textDocument/didOpen" or method == "textDocument/didChange" then
+      local uri = params.textDocument.uri
+      vim.schedule(function()
+        if not closing then
+          publish(dispatchers, uri)
+        end
+      end)
+    elseif method == "textDocument/didClose" then
+      dispatchers.notification("textDocument/publishDiagnostics", { uri = params.textDocument.uri, diagnostics = {} })
     elseif method == "exit" then
       closing = true
+      instances[srv] = nil
       dispatchers.on_exit(0, 15)
     end
     return true
@@ -115,6 +155,7 @@ function M.cmd(dispatchers)
 
   function srv.terminate()
     closing = true
+    instances[srv] = nil
   end
 
   return srv

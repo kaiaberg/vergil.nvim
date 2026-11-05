@@ -10,6 +10,16 @@ local float = require("vergil.ui.float")
 
 local M = {}
 
+local active_cancel ---@type fun()?
+
+--- Cancels an open selector right away (not on the next tick), e.g. before
+--- submitting, so a typed `#` is removed before the prompt is written.
+function M.cancel_active()
+  if active_cancel then
+    active_cancel()
+  end
+end
+
 ---@alias vergil.SelectorAction "mention"|"snippet"|"both"
 
 ---@class vergil.SelectorResult
@@ -77,6 +87,7 @@ function M.open(opts)
       return
     end
     finished = true
+    active_cancel = nil
     close()
     opts.on_cancel()
   end
@@ -85,6 +96,7 @@ function M.open(opts)
       return
     end
     finished = true
+    active_cancel = nil
     if s > e then
       s, e = e, s
     end
@@ -117,6 +129,8 @@ function M.open(opts)
     -- Normal mode only: Esc in Visual mode keeps its usual meaning.
     map("n", lhs, cancel, "cancel")
   end
+
+  active_cancel = cancel
 
   -- Closing or leaving the window any other way counts as cancelling.
   vim.api.nvim_create_autocmd({ "WinClosed", "WinLeave" }, {

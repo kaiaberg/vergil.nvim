@@ -8,6 +8,11 @@ M.preset = {
   { lhs = "gs", plug = "<Plug>(vergil-snippet)", desc = "Replace reference with its lines" },
   { lhs = "gb", plug = "<Plug>(vergil-snippet-both)", desc = "Add the reference's lines below" },
   { lhs = "<Esc>", plug = "<Plug>(vergil-close-preview)", desc = "Close the preview, or Esc" },
+  { lhs = "gf", plug = "<Plug>(vergil-open)", desc = "Open the reference, or gf" },
+  { lhs = "<C-w>f", plug = "<Plug>(vergil-open-split)", desc = "Open the reference in a split, or <C-w>f" },
+  { lhs = "<C-w>gf", plug = "<Plug>(vergil-open-tab)", desc = "Open the reference in a tab, or <C-w>gf" },
+  { lhs = "ZZ", plug = "<Plug>(vergil-submit)", desc = "Submit the prompt" },
+  { lhs = "ZQ", plug = "<Plug>(vergil-abort)", desc = "Abort: restore the prompt from before Ctrl+G" },
 }
 
 local group = vim.api.nvim_create_augroup("vergil.keymaps", { clear = true })
@@ -45,20 +50,69 @@ local function fallback_esc()
   vim.api.nvim_feedkeys(vim.keycode("<Esc>"), "n", false)
 end
 
---- Defines the global `<Plug>` mappings. Called once from plugin/vergil.lua.
-function M.define_plugs()
-  local function run(sub)
-    return function()
-      require("vergil.commands").run({ fargs = sub })
+local function notify(err)
+  vim.notify("vergil: " .. err, vim.log.levels.WARN)
+end
+
+--- An action reporting `(ok, err)`; `fallback` runs native keys when there
+--- is no reference under the cursor.
+local function act(fn, fallback)
+  return function()
+    local ok, err = fn()
+    if ok then
+      return
+    end
+    if fallback and err == "no reference under the cursor" then
+      vim.cmd.normal({ vim.keycode(fallback), bang = true })
+    elseif err then
+      notify(err)
     end
   end
-  vim.keymap.set("n", "<Plug>(vergil-snippet)", run({ "snippet" }), { desc = "vergil: replace reference with its lines" })
-  vim.keymap.set("n", "<Plug>(vergil-snippet-both)", run({ "snippet", "both" }), { desc = "vergil: add the reference's lines below" })
-  vim.keymap.set("n", "<Plug>(vergil-close-preview)", function()
-    if not M.close_preview() then
-      fallback_esc()
-    end
-  end, { desc = "vergil: close the preview, or Esc" })
+end
+
+--- Defines the global `<Plug>` mappings. Called once from plugin/vergil.lua.
+function M.define_plugs()
+  local vergil = function()
+    return require("vergil")
+  end
+  local range = function()
+    return require("vergil.range")
+  end
+  local plugs = {
+    ["snippet"] = { act(function() return range().snippet_at_cursor("snippet") end), "replace reference with its lines" },
+    ["snippet-both"] = { act(function() return range().snippet_at_cursor("both") end), "add the reference's lines below" },
+    ["range"] = { act(function() return range().select_at_cursor() end), "select lines for the reference" },
+    ["toggle"] = { act(function() return vergil().toggle() end), "convert between attachment and mention" },
+    ["preview"] = { act(function() return vergil().preview() end), "preview the reference" },
+    ["open"] = { act(function() return vergil().open() end, "gf"), "open the reference" },
+    ["open-split"] = { act(function() return vergil().open("split") end, "<C-w>f"), "open the reference in a split" },
+    ["open-vsplit"] = { act(function() return vergil().open("vsplit") end), "open the reference in a vsplit" },
+    ["open-tab"] = { act(function() return vergil().open("tab") end, "<C-w>gf"), "open the reference in a tab" },
+    ["submit"] = { act(function() return require("vergil.submit").submit() end), "submit the prompt" },
+    ["abort"] = { act(function() return require("vergil.submit").abort() end), "abort and restore the prompt" },
+    ["pick-attach"] = { act(function() return require("vergil.picker").pick("attach") end), "pick a file to attach" },
+    ["pick-mention"] = { act(function() return require("vergil.picker").pick("mention") end), "pick a file to mention" },
+    ["pick-skills"] = { act(function() return require("vergil.picker").pick("skills") end), "pick a skill" },
+    ["close-preview"] = {
+      function()
+        if not M.close_preview() then
+          fallback_esc()
+        end
+      end,
+      "close the preview, or Esc",
+    },
+  }
+  for name, p in pairs(plugs) do
+    vim.keymap.set("n", ("<Plug>(vergil-%s)"):format(name), p[1], { desc = "vergil: " .. p[2] })
+  end
+  for _, kind in ipairs({ "attach", "mention", "skills" }) do
+    vim.keymap.set("i", ("<Plug>(vergil-pick-%s)"):format(kind), function()
+      local ok, err = require("vergil.picker").pick(kind)
+      if not ok then
+        notify(err)
+      end
+    end, { desc = "vergil: pick (" .. kind .. ")" })
+  end
 end
 
 --- In a focused preview float (after pressing `K` twice), Neovim maps only
