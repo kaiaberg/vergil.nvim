@@ -170,22 +170,14 @@ needed.
 **0.11**, tested on 0.11.7 and 0.12.6. 0.11 needs the native-completion fix
 from lesson 7. CI should cover 0.11.x and the latest stable release.
 
-### Trying the prototype
+### Trying it
 
-Inside the real `Ctrl+G` flow, with your own config:
-
-```sh
-cd /some/project
-VISUAL=~/code/vergil.nvim/prototype/m0/editor.sh claude
-```
-
-Standalone, with a minimal config per engine:
+The prototype was removed in Milestone 2, when the real plugin replaced it
+(see git history at `a0d51bc`). To try the plugin in the real `Ctrl+G` flow:
 
 ```sh
 cd /some/project
-nvim -n --clean -u ~/code/vergil.nvim/prototype/m0/init_native.lua claude-prompt-test.md
-VERGIL_PACK=/path/to/plugins nvim -n --clean -u ~/code/vergil.nvim/prototype/m0/init_cmp.lua claude-prompt-test.md
-VERGIL_BLINK=/path/to/blink.cmp nvim -n --clean -u ~/code/vergil.nvim/prototype/m0/init_blink.lua claude-prompt-test.md
+VISUAL=~/code/vergil.nvim/scripts/dev-editor.sh claude
 ```
 
 ### Other notes

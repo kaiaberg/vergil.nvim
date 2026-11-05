@@ -51,4 +51,44 @@ function M.buffer(name, lines)
   return bufnr
 end
 
+--- Opens `claude-prompt-<name>.md` under `root` as the session root, with
+--- the plugin loaded, and returns its buffer and vergil LSP client.
+local prompt_count = 0
+function M.prompt(root, lines, name)
+  M.load_plugin()
+  require("vergil").setup({ root = root })
+  prompt_count = prompt_count + 1
+  vim.cmd.edit(vim.fn.fnameescape(("%s/claude-prompt-%s%d.md"):format(root, name or "t", prompt_count)))
+  local bufnr = vim.api.nvim_get_current_buf()
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines or {})
+  local client
+  vim.wait(2000, function()
+    client = vim.lsp.get_clients({ bufnr = bufnr, name = "vergil" })[1]
+    return client ~= nil and client.initialized
+  end)
+  assert(client, "vergil client did not attach")
+  return bufnr, client
+end
+
+function M.load_plugin()
+  if not vim.g.loaded_vergil then
+    local root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
+    vim.cmd.source(root .. "/plugin/vergil.lua")
+  end
+end
+
+--- Sends a request and waits for its result.
+function M.request(client, bufnr, method, row, col, context)
+  local params = { textDocument = { uri = vim.uri_from_bufnr(bufnr) }, position = { line = row, character = col }, context = context }
+  local res = client:request_sync(method, params, 3000, bufnr)
+  assert(res, method .. " timed out")
+  assert(not res.err, vim.inspect(res.err))
+  return res.result
+end
+
+--- Labels of a completion result.
+function M.labels(result)
+  return vim.tbl_map(function(i) return i.label end, result.items)
+end
+
 return M

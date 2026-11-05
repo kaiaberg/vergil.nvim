@@ -16,3 +16,15 @@ All notable changes are documented here. The format follows
   boundaries, quoting and trailing punctuation.
 - Sessions: activation on `claude-prompt-*.md`, a root captured at startup,
   and `:Vergil enable`, `:Vergil disable` and `:Vergil toggle`.
+- In-process LSP server attached to prompt buffers: `@` and `@@` file
+  completion with server-side fuzzy ranking, re-search in place on manual
+  completion, and reopening the menu after Backspace.
+- Asynchronous, cached file discovery (`rg`, `fd`, `git ls-files` or a
+  built-in scan) with an optional custom command.
+- Hover previews (`K`, `:Vergil preview`) and go-to-definition, plus
+  `:Vergil open [split|vsplit|tab]`.
+- `completion.native` to enable Neovim's built-in completion.
+
+### Removed
+
+- The M0 prototype, superseded by the plugin.

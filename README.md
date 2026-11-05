@@ -3,9 +3,10 @@
 A lightweight, Vim-native toolkit for composing prompts for coding agents,
 starting with Claude Code's `Ctrl+G` external editor.
 
-> **Status:** pre-alpha. The reference core exists (`:Vergil toggle` converts
-> between `@path` and `` `path` ``); completion, line selection and the rest
-> are still to come. See `docs/m0-findings.md`.
+> **Status:** pre-alpha. `@`/`@@` file completion, hover previews, opening
+> references and `:Vergil toggle` work; line selection, skills and diagnostics
+> are still to come. Try a checkout with
+> `VISUAL=path/to/vergil.nvim/scripts/dev-editor.sh claude`.
 
 ## Requirements
 

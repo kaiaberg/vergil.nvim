@@ -31,6 +31,61 @@ function M.references(bufnr)
   return require("vergil.reference.parser").parse_buffer(bufnr or 0)
 end
 
+local function current_session()
+  local s = require("vergil.session").get(vim.api.nvim_get_current_buf())
+  if not s then
+    return nil, "not enabled in this buffer (use :Vergil enable)"
+  end
+  return s
+end
+
+--- Shows a preview of the reference under the cursor in a float.
+---@return boolean ok
+---@return string? err
+function M.preview()
+  local s, err = current_session()
+  if not s then
+    return false, err
+  end
+  local parser = require("vergil.reference.parser")
+  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+  local ref = parser.at(parser.parse_buffer(s.bufnr), row - 1, col)
+  local contents = ref and require("vergil.lsp.hover").contents(ref, s.root)
+  if not contents then
+    return false, "no reference under the cursor"
+  end
+  vim.lsp.util.open_floating_preview(contents, "markdown", { border = "rounded", focus_id = "vergil-preview" })
+  return true
+end
+
+local OPEN_CMDS = { split = "split", vsplit = "vsplit", tab = "tabedit" }
+
+--- Opens the target of the reference under the cursor at its line.
+---@param how? "split"|"vsplit"|"tab" nil opens in the current window
+---@return boolean ok
+---@return string? err
+function M.open(how)
+  if how ~= nil and not OPEN_CMDS[how] then
+    return false, ("unknown open mode %q; expected split, vsplit or tab"):format(how)
+  end
+  local s, err = current_session()
+  if not s then
+    return false, err
+  end
+  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+  local target, terr = require("vergil.lsp.definition").target_at(s.bufnr, row - 1, col, s.root)
+  if not target then
+    return false, terr
+  end
+  vim.cmd({ cmd = how and OPEN_CMDS[how] or "edit", args = { target.abs }, magic = { file = false } })
+  if target.type == "file" then
+    local last = vim.api.nvim_buf_line_count(0)
+    vim.api.nvim_win_set_cursor(0, { math.min(target.line, last), 0 })
+    vim.cmd("normal! zz")
+  end
+  return true
+end
+
 --- Converts the reference under the cursor to the other type.
 ---@return boolean ok
 ---@return string? err

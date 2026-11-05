@@ -13,6 +13,18 @@ M.subcommands = {
   disable = function()
     require("vergil.session").disable(0)
   end,
+  preview = function()
+    local ok, err = require("vergil").preview()
+    if not ok then
+      notify(err, vim.log.levels.WARN)
+    end
+  end,
+  open = function(args)
+    local ok, err = require("vergil").open(args[1])
+    if not ok then
+      notify(err, vim.log.levels.WARN)
+    end
+  end,
   toggle = function()
     local ok, err = require("vergil").toggle()
     if not ok then
@@ -46,6 +58,11 @@ end
 ---@param cmdline string
 ---@return string[]
 function M.complete(arglead, cmdline)
+  if cmdline:match("^%s*%S+%s+open%s+%S*$") then
+    return vim.tbl_filter(function(n)
+      return vim.startswith(n, arglead)
+    end, { "split", "vsplit", "tab" })
+  end
   if cmdline:match("^%s*%S+%s+%S+%s") then
     return {}
   end

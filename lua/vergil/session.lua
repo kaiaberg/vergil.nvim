@@ -67,6 +67,7 @@ function M.enable(bufnr)
   local session = { bufnr = bufnr, root = M.root(), agent = config.options.agent }
   sessions[bufnr] = session
   vim.b[bufnr].vergil_enabled = true
+  require("vergil.lsp.client").attach(bufnr)
   vim.api.nvim_exec_autocmds("User", { pattern = "VergilEnable", data = { bufnr = bufnr }, modeline = false })
   return session
 end
@@ -81,6 +82,7 @@ function M.disable(bufnr)
   sessions[bufnr] = nil
   if vim.api.nvim_buf_is_valid(bufnr) then
     vim.b[bufnr].vergil_enabled = nil
+    require("vergil.lsp.client").detach(bufnr)
   end
   vim.api.nvim_exec_autocmds("User", { pattern = "VergilDisable", data = { bufnr = bufnr }, modeline = false })
 end

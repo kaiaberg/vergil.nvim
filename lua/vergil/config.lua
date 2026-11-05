@@ -10,6 +10,9 @@ local M = {}
 ---@field root string? explicit session root; defaults to Neovim's startup cwd
 ---@field activation { filename_patterns: string[]? } nil patterns = adapter default
 ---@field mention { format: "github"|"colon"|vergil.MentionTemplates }
+---@field triggers { attach: string, mention: string } completion triggers
+---@field completion { native: boolean, reopen_on_backspace: boolean }
+---@field files { command: string[]? } custom discovery command, run in the root
 
 ---@type vergil.Config
 M.defaults = {
@@ -17,6 +20,15 @@ M.defaults = {
   root = nil,
   activation = { filename_patterns = nil },
   mention = { format = "github" },
+  triggers = { attach = "@", mention = "@@" },
+  completion = {
+    -- Enable Neovim's built-in LSP completion in prompt buffers. Leave off
+    -- when a completion plugin (blink.cmp, nvim-cmp) is installed.
+    native = false,
+    -- Reopen the menu when Backspace inside a reference closed it.
+    reopen_on_backspace = true,
+  },
+  files = { command = nil },
 }
 
 ---@type vergil.Config
@@ -30,6 +42,19 @@ function M.set(opts)
   vim.validate("root", opts.root, "string", true)
   vim.validate("activation", opts.activation, "table", true)
   vim.validate("mention", opts.mention, "table", true)
+  vim.validate("triggers", opts.triggers, "table", true)
+  vim.validate("completion", opts.completion, "table", true)
+  vim.validate("files", opts.files, "table", true)
+  if opts.files then
+    vim.validate("files.command", opts.files.command, "table", true)
+  end
+  for _, k in ipairs({ "attach", "mention" }) do
+    local t = opts.triggers and opts.triggers[k]
+    vim.validate("triggers." .. k, t, "string", true)
+    if t and (t == "" or t:find("%s")) then
+      error(("vergil: triggers.%s must be non-empty without whitespace"):format(k), 0)
+    end
+  end
   if opts.activation then
     vim.validate("activation.filename_patterns", opts.activation.filename_patterns, "table", true)
   end
