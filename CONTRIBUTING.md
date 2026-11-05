@@ -14,4 +14,5 @@
 ## Tests
 
 - `make test` runs the unit and headless specs (`tests/**/*_spec.lua`) with the bundled runner.
-- `make contract` runs the Claude Code contract suite. It drives a real `claude` session in tmux, so run it manually and again after Claude Code updates.
+- `make contract` runs the Claude Code contract suite, and `make handoff` the end-to-end `Ctrl+G` test through vergil. Both drive a real `claude` session in tmux and cost a few small API calls, so run them manually, and again after Claude Code updates.
+- Run `make test` on the oldest supported Neovim (0.11) as well as the latest release.

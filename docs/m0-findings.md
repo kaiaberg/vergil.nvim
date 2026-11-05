@@ -26,6 +26,8 @@ come from transcript markers. Reproduce with `make contract`.
 | Which `@` counts as a reference? (M1) | Only at line start or after whitespace (space, tab). `(@a)`, `"@a"`, `` `@a` `` and `x@a` are **not** references | The parser's boundary rule; completion triggers must use the same rule |
 | Trailing punctuation after an unquoted path (M1) | Any run of ``.,;:!?)]}>'"` `` (backtick included) is stripped: `@a.ts),` and `@a.ts...` attach `a.ts` | Spans exclude trailing punctuation, so conversions keep it |
 | `@dir/` (M1) | Lists the directory | Directories are attachments |
+| Paste re-collapse after `Ctrl+G` (M6) | A collapsed paste collapses again when edits are elsewhere, with vergil and `ZZ`; a paste at the very end of the prompt never does, even with plain Neovim and no write | Documented limitation; `make handoff` checks the working case |
+| Editor that fails to start (M6) | Claude Code silently keeps the prompt, no error shown | Troubleshooting entry |
 | Temp file name | `/tmp/claude-501/claude-prompt-<uuid>.md` (a UUID, not a hash) | Pattern `claude-prompt-*.md` still fits |
 
 Still open, since they don't affect the grammar: how reliably Claude interprets

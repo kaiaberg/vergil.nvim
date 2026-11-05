@@ -38,8 +38,10 @@ local handlers = {
   end,
 }
 
---- Running server instances, for pushing diagnostics outside of requests.
-local instances = {} ---@type table<table, vim.lsp.rpc.Dispatchers>
+--- Running server instances, for pushing diagnostics outside of requests,
+--- with the documents each one has open: publishing through an instance that
+--- doesn't own a document would duplicate its diagnostics under another client.
+local instances = {} ---@type table<table, { dispatchers: vim.lsp.rpc.Dispatchers, uris: table<string, boolean> }>
 
 local function publish(dispatchers, uri)
   local session = require("vergil.session").get(vim.uri_to_bufnr(uri))
@@ -58,8 +60,10 @@ function M.refresh(bufnr)
     return
   end
   local uri = vim.uri_from_bufnr(bufnr)
-  for _, dispatchers in pairs(instances) do
-    publish(dispatchers, uri)
+  for _, inst in pairs(instances) do
+    if inst.uris[uri] then
+      publish(inst.dispatchers, uri)
+    end
   end
 end
 
@@ -86,7 +90,8 @@ function M.cmd(dispatchers)
   local pending = {} ---@type table<integer, fun(err: table?, result: any)>
 
   local srv = {}
-  instances[srv] = dispatchers
+  local open_uris = {}
+  instances[srv] = { dispatchers = dispatchers, uris = open_uris }
 
   function srv.request(method, params, callback)
     next_id = next_id + 1
@@ -134,12 +139,14 @@ function M.cmd(dispatchers)
       pending[params.id]({ code = ERR_CANCELLED, message = "cancelled" }, nil)
     elseif method == "textDocument/didOpen" or method == "textDocument/didChange" then
       local uri = params.textDocument.uri
+      open_uris[uri] = true
       vim.schedule(function()
         if not closing then
           publish(dispatchers, uri)
         end
       end)
     elseif method == "textDocument/didClose" then
+      open_uris[params.textDocument.uri] = nil
       dispatchers.notification("textDocument/publishDiagnostics", { uri = params.textDocument.uri, diagnostics = {} })
     elseif method == "exit" then
       closing = true

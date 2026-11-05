@@ -1,0 +1,401 @@
+*vergil.txt*  A Vim-native guide for writing prompts for coding agents
+
+                                            Let us not speak of them, but
+                                            look, and pass.
+                                              — Virgil, Inferno III
+                                                (trans. Longfellow)
+
+==============================================================================
+CONTENTS                                                     *vergil-contents*
+
+  1. Introduction ........................................ |vergil-intro|
+  2. Setup ............................................... |vergil-setup|
+  3. References: attach and mention ...................... |vergil-references|
+  4. Completion .......................................... |vergil-completion|
+  5. Line selection and snippets ......................... |vergil-lines|
+  6. Skills and commands ................................. |vergil-skills|
+  7. Preview and open .................................... |vergil-preview|
+  8. Diagnostics and code actions ........................ |vergil-diagnostics|
+  9. Submit and abort .................................... |vergil-submit|
+ 10. Commands ............................................ |vergil-commands|
+ 11. Mappings ............................................ |vergil-mappings|
+ 12. Configuration ....................................... |vergil-config|
+ 13. Events and API ...................................... |vergil-api|
+ 14. Limitations ......................................... |vergil-limitations|
+ 15. Troubleshooting ..................................... |vergil-troubleshooting|
+
+==============================================================================
+1. INTRODUCTION                                                 *vergil-intro*
+
+vergil helps you write prompts for Claude Code in the Neovim instance that
+Claude Code's `Ctrl+G` opens. It completes file references and skills,
+selects exact lines with real Vim motions, inserts verbatim snippets,
+previews and opens references, and flags references Claude Code would
+mishandle.
+
+vergil only helps write the prompt. It never sends anything, never runs
+skills, and never changes text you didn't ask it to change. It runs as an
+LSP server inside Neovim, so hover, go-to-definition, diagnostics and code
+actions use Neovim's usual LSP mappings.
+
+==============================================================================
+2. SETUP                                                        *vergil-setup*
+
+Requirements: Neovim 0.11 or newer and Claude Code. Optional: a completion
+engine (blink.cmp, nvim-cmp, or built-in completion), telescope.nvim for
+|:Vergil-pick|, ripgrep, fd or git for file discovery, and a Nerd Font for
+completion icons.
+
+Claude Code opens `$VISUAL` before `$EDITOR`, so set: >sh
+  export VISUAL=nvim
+<
+vergil works without |vergil.setup()|. It turns itself on in buffers whose
+file name matches `claude-prompt-*.md` (only the name is checked, not the
+directory) and nowhere else. Use |:Vergil-enable| for other buffers.
+
+The project root is the directory Neovim started in, which is where Claude
+Code runs. It is captured once and survives |:cd|. Set `root` to override it.
+
+Run |:checkhealth| `vergil` to check the setup.
+
+==============================================================================
+3. REFERENCES: ATTACH AND MENTION                          *vergil-references*
+
+                                                           *vergil-attachment*
+`@path` attaches a file: Claude Code loads the whole file into the
+conversation. Paths with spaces are quoted: `@"docs/my notes.md"`. A range
+written on an attachment (`@file#L3`) doesn't limit it, and files above about
+25k tokens are dropped silently.
+
+                                                              *vergil-mention*
+`` `path` `` mentions a file: Claude knows where to look and reads it only
+if needed. Mentions can point at lines: `` `path#L12` ``, `` `path#L12-L35` ``
+(the "github" format) or `` `path:12-35` `` (the "colon" format).
+
+Attach the files Claude must read in full, once; mention everything else.
+Mentions of an attached file are never flagged.
+
+Rules vergil follows, verified against Claude Code 2.1.318:
+- `@` starts a reference only at line start or after whitespace, so `(@a)`,
+  `"@a"`, `` `@a` `` and `me@example.com` are not references.
+- Trailing punctuation after an unquoted path is not part of it:
+  `@a.ts),` attaches `a.ts`.
+- Claude Code ignores Markdown: `@Override` inside fenced code is attached
+  when a file of that name exists.
+
+                                                         *vergil-:Vergil-toggle*
+|:Vergil-toggle| and the "Convert" code action switch between the two:
+`@file` <-> `` `file` ``, and `` `file#L12-L35` `` becomes
+`@file` `` `file#L12-L35` ``, so the range isn't lost.
+
+==============================================================================
+4. COMPLETION                                              *vergil-completion*
+
+- `@` at line start or after whitespace completes files to attach.
+- `@@` completes files to mention.
+- `/` at line start or after whitespace completes skills and commands.
+
+Matching is fuzzy and ranked by vergil, so every engine shows the same order.
+Each file shows its size; files already attached are marked "attached".
+Nothing is offered inside fenced code.
+
+Manual completion (`<C-Space>` in most setups) on an existing reference
+re-searches it in place: the query is the path up to the cursor, and
+accepting replaces the whole reference. Backspace inside a reference reopens
+a menu the engine closed (`completion.reopen_on_backspace`).
+
+Engine notes:
+- blink.cmp: return only `{ "lsp" }` from `sources.default` when
+  `vim.b.vergil_enabled` is set, so snippets don't pop up in prose.
+- nvim-cmp: on the |VergilEnable| event, set buffer-local sources with
+  `cmp.setup.buffer`.
+- Built-in completion: set `completion.native = true` and add `popup` to
+  'completeopt' to see skill descriptions. Leave it off with a completion
+  plugin, or two menus open.
+
+==============================================================================
+5. LINE SELECTION AND SNIPPETS                       *vergil-lines* *vergil-#*
+
+Type `#` directly after a reference that names a text file, or use
+|:Vergil-range|. A float opens with a read-only copy of the file, highlighted
+and numbered. The real file is never loaded, so no swapfile and no LSP client
+are involved. Use any motion, search, count or |V|, then:
+
+  <CR>     Insert a mention with the selected lines (or the current line;
+           a count selects that many lines). It replaces the reference and
+           the `#`.
+  gs       Insert a verbatim snippet. The reference becomes the snippet's
+           header; if it stood alone on its line, the snippet replaces the
+           line.
+  gb       Insert the mention, and the snippet below the line.
+  q <Esc>  Cancel: removes the `#`, nothing else. <Esc> in Visual mode only
+           leaves Visual mode.
+
+A selected range always produces a mention: selecting lines from an `@`
+attachment removes the `@`.
+
+                                                             *vergil-snippet*
+Snippets have a mention header (never `@`, which would load the code again),
+keep whitespace exactly, use a fence longer than any backtick run in the
+code, and take the language from the file name:
+>markdown
+  From `src/auth/session.ts#L12-L15`:
+
+  ```typescript
+  if (!token) {
+    throw new AuthError();
+  }
+  ```
+<
+|:Vergil-snippet| does the same for a ranged reference already in the prompt.
+
+==============================================================================
+6. SKILLS AND COMMANDS                                         *vergil-skills*
+
+`/` lists skills and commands from:
+- the project: `.claude/skills/<name>/SKILL.md` and `.claude/commands/**.md`
+  in the root and every parent up to the repository root,
+- your personal `~/.claude`, and the managed settings directory,
+- synced claude.ai skills, and enabled plugins (best effort, as
+  `/<plugin>:<name>`),
+- `skills.extra_items` from your configuration, e.g. built-ins like /compact.
+
+A skill's command is its frontmatter `name`, else its directory name;
+`commands/sub/deep.md` is `/sub:deep`. On a name clash a skill beats a
+command, and personal beats project; hover lists what an item overrides.
+Without a description, the first line of the body is shown. Accepting
+inserts the command only. Hover (`K`) and go-to-definition (`gd`) work on
+`/skill` in the prompt.
+
+==============================================================================
+7. PREVIEW AND OPEN                                           *vergil-preview*
+
+`K` (hover) previews a reference: size, line count, and the referenced lines
+or the start of the file. Directories list their entries. On a `/skill` it
+shows the description and where it's defined.
+
+`gd` or `<C-]>` opens the target at its line in the current window.
+|:Vergil-open| `split`, `vsplit` or `tab` opens it elsewhere. With
+`return_to_prompt` (default), `:q` in a file opened this way returns to the
+prompt instead of exiting Neovim and handing back to Claude Code.
+
+==============================================================================
+8. DIAGNOSTICS AND CODE ACTIONS                           *vergil-diagnostics*
+
+  Check                                              Default severity
+  Same file attached twice (paths normalized)        warn
+  Attachment above `attachment_token_warning`        warn
+    (tokens estimated as bytes / 3)
+  Mention range past the end of the file             warn
+  `@file#range`: the range doesn't limit it          hint
+  Mention target not found                           warn
+  Attachment target not found                        info
+  `@file` in fenced code that will still attach      hint
+
+Ordinary inline code that might be a path, prose and pasted logs aren't
+flagged beyond the low-severity "attachment not found". Validation never
+changes the buffer.
+
+Code actions (`gra`): convert between attachment and mention (preferred as a
+fix for duplicate, large and ranged attachments), replace with snippet, add
+snippet below, and select lines.
+
+==============================================================================
+9. SUBMIT AND ABORT                                            *vergil-submit*
+
+`:wq` doesn't exit Neovim while other windows are open, which leaves Claude
+Code waiting, and quitting with modified buffers fails.
+
+|:Vergil-submit| closes floats, writes the prompt, asks what to do with other
+modified buffers (save all, discard or cancel; never silently), then exits.
+
+|:Vergil-abort| asks the same question, then exits with |:cquit|. Claude Code
+then restores the prompt from before `Ctrl+G`, even if it was written.
+
+==============================================================================
+10. COMMANDS                                                 *vergil-commands*
+
+                                                                     *:Vergil*
+:Vergil preview                                         *:Vergil-preview*
+    Preview the reference or skill under the cursor.
+
+:Vergil open [split|vsplit|tab]                            *:Vergil-open*
+    Open the target of the reference or skill under the cursor.
+
+:Vergil range                                             *:Vergil-range*
+    Select lines for the reference under the cursor.
+
+:Vergil snippet [both]                                  *:Vergil-snippet*
+    Replace the ranged reference under the cursor with its lines; with
+    `both`, keep it and add the lines below. Without a range, opens the line
+    selector.
+
+:Vergil toggle                                           *:Vergil-toggle*
+    Convert the reference under the cursor between attachment and mention.
+
+:Vergil pick [attach|mention|skills]                       *:Vergil-pick*
+    Full-size picker. <CR> inserts, <C-t> switches between attachment and
+    mention, <C-r> selects lines. Uses telescope.nvim, else |vim.ui.select|
+    (<CR> only).
+
+:Vergil submit                                           *:Vergil-submit*
+    Write the prompt, settle other modified buffers, exit.
+
+:Vergil abort                                             *:Vergil-abort*
+    Settle other modified buffers, then exit so Claude Code restores the
+    previous prompt.
+
+:Vergil enable                                           *:Vergil-enable*
+:Vergil disable                                         *:Vergil-disable*
+    Turn vergil on or off in the current buffer.
+
+==============================================================================
+11. MAPPINGS                                                 *vergil-mappings*
+
+vergil maps nothing by default. Normal-mode <Plug> mappings:
+
+  <Plug>(vergil-snippet)        <Plug>(vergil-snippet-both)
+  <Plug>(vergil-range)          <Plug>(vergil-toggle)
+  <Plug>(vergil-preview)        <Plug>(vergil-close-preview)
+  <Plug>(vergil-open)           <Plug>(vergil-open-split)
+  <Plug>(vergil-open-vsplit)    <Plug>(vergil-open-tab)
+  <Plug>(vergil-submit)         <Plug>(vergil-abort)
+  <Plug>(vergil-pick-attach)    <Plug>(vergil-pick-mention)
+  <Plug>(vergil-pick-skills)
+
+The pick mappings also exist in Insert mode.
+
+                                                        *vergil-keymap-preset*
+`keymaps = { preset = true }` maps, in prompt buffers only:
+
+  gs        Replace a ranged reference with its lines
+  gb        Keep it and add its lines below
+  gf        Open the reference; the native |gf| elsewhere
+  <C-w>f    Open it in a split; the native |CTRL-W_f| elsewhere
+  <C-w>gf   Open it in a tab; the native |CTRL-W_gf| elsewhere
+  ZZ        |:Vergil-submit|
+  ZQ        |:Vergil-abort|
+  <Esc>     Close an open preview, also when focused; a normal <Esc>
+            otherwise
+
+==============================================================================
+12. CONFIGURATION                                              *vergil-config*
+
+                                                              *vergil.setup()*
+Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
+  require("vergil").setup({
+    agent = "claude",
+    root = nil,
+    activation = { filename_patterns = nil }, -- nil: { "claude-prompt-*.md" }
+    mention = { format = "github" },
+    triggers = { attach = "@", mention = "@@", range = "#", skills = "/" },
+    skills = { extra_items = {} },
+    selector = {
+      keys = { mention = "<CR>", snippet = "gs", both = "gb",
+               cancel = { "q", "<Esc>" } },
+    },
+    completion = { native = false, reopen_on_backspace = true },
+    files = { command = nil },
+    keymaps = { preset = false },
+    return_to_prompt = true,
+    picker = { backend = "auto" },
+    diagnostics = {
+      attachment_token_warning = 20000,
+      severity = {
+        duplicate = "warn", large = "warn", range = "warn",
+        ignored_range = "hint", missing_mention = "warn",
+        missing_attachment = "info", fenced = "hint",
+      },
+    },
+  })
+<
+`root`                  Project root. Default: Neovim's startup directory.
+`activation.filename_patterns`
+                        File-name globs that turn vergil on.
+`mention.format`        "github", "colon", or templates such as
+                        `{ single = "{path}#L{start}",`
+                        `  range = "{path}#L{start}-L{end}" }`. A template
+                        starts with {path}, has a separator after it, and
+                        puts {start} before {end}.
+`triggers`              Completion and selector triggers. `range` must be a
+                        single character.
+`skills.extra_items`    Extra `/` items: `{ name, description?,
+                        argument_hint? }`. Discovered items win name clashes.
+`selector.keys`         Keys in the line selector.
+`completion.native`     Enable built-in LSP completion in prompt buffers.
+`completion.reopen_on_backspace`
+                        Reopen the menu after Backspace inside a reference.
+`files.command`         Discovery command run in the root, printing one
+                        relative path per line. Default: rg, fd, git, then a
+                        built-in scan.
+`keymaps.preset`        See |vergil-keymap-preset|.
+`return_to_prompt`      See |vergil-preview|.
+`picker.backend`        "auto", "telescope" or "select".
+`diagnostics.attachment_token_warning`
+                        Estimated tokens (bytes / 3) above which an
+                        attachment is flagged.
+`diagnostics.severity`  "error", "warn", "info", "hint", or false to turn a
+                        check off.
+
+==============================================================================
+13. EVENTS AND API                                                *vergil-api*
+
+                                                *VergilEnable* *VergilDisable*
+|User| autocommands with `pattern = "VergilEnable"` / `"VergilDisable"`, fired
+when vergil turns on or off in a buffer; `ev.data.bufnr` is the buffer.
+`vim.b.vergil_enabled` is true in enabled buffers.
+
+Lua API: `require("vergil")`
+  `setup(opts)`           Configure.
+  `enable(bufnr?)`        Turn on in a buffer.
+  `disable(bufnr?)`       Turn off.
+  `references(bufnr?)`    References in a buffer, with exact spans.
+  `toggle()`, `preview()`, `open(how?)`
+                          The actions behind the commands; they return
+                          `ok, err`.
+
+==============================================================================
+14. LIMITATIONS                                           *vergil-limitations*
+
+- Claude Code's syntax and limits are undocumented. vergil follows behaviour
+  verified against Claude Code 2.1.318; `make contract` checks it again.
+- Only the short-lived `Ctrl+G` Neovim is supported.
+- vergil sees only the current prompt, not files attached earlier.
+- `@words` in pasted text may be reported as missing files (Info).
+- The large-attachment warning is an estimate.
+- Mentions with ranges are a convention Claude followed in testing; nothing
+  enforces them.
+- Plugin skill discovery and synced-skill naming are best effort.
+- Skills with `user-invocable: false` are listed, as in Claude Code's menu.
+- Format-on-save or whitespace trimming stops Claude Code from collapsing
+  unchanged pasted text again.
+- A paste at the very end of the prompt stays expanded after `Ctrl+G`, even
+  with plain Neovim; text after the paste avoids it.
+
+==============================================================================
+15. TROUBLESHOOTING                                   *vergil-troubleshooting*
+
+Nothing happens when typing `@`
+  Check `:echo b:vergil_enabled`, that Claude Code opens Neovim (it prefers
+  `$VISUAL` over `$EDITOR`), and that a completion engine is active.
+
+`Ctrl+G` does nothing
+  If the editor fails to start, Claude Code silently keeps the prompt. Run
+  the command in `$VISUAL` yourself to see the error.
+
+Snippets or paths pop up while typing prose
+  Limit the completion engine to the LSP source in prompt buffers; see
+  |vergil-completion|.
+
+Icons show as boxes
+  Install a Nerd Font, or hide icons in prompt buffers. blink.cmp accepts a
+  function for `completion.menu.draw.columns` that can drop "kind_icon" when
+  `vim.b.vergil_enabled` is set.
+
+`:wq` leaves Claude Code waiting
+  Other windows or modified buffers keep Neovim open. Use |:Vergil-submit|.
+
+Pasted text no longer collapses in Claude Code
+  Something rewrote the prompt on save. See |:checkhealth| `vergil`.
+
+ vim:tw=78:ts=8:noet:ft=help:norl:

@@ -6,10 +6,16 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-05
+
+First release: a Vim-native toolkit for writing Claude Code prompts in the
+`Ctrl+G` editor. Requires Neovim 0.11+. Verified against Claude Code 2.1.318.
+
 ### Added
 
-- M0 LSP completion prototype (`prototype/m0/`), dependency-free test runner,
-  and scripted Claude Code contract tests.
+- Dependency-free test runner (`make test`), Claude Code contract tests
+  (`make contract`) and an end-to-end `Ctrl+G` handoff test (`make handoff`).
+- README and `:help vergil`.
 - Reference core: parser with exact spans, resolver, mention formatter
   (`github`, `colon` or custom templates) and attachment/mention conversion.
 - Claude Code adapter: attachment syntax following contract-tested rules for
@@ -67,3 +73,6 @@ All notable changes are documented here. The format follows
 ### Removed
 
 - The M0 prototype, superseded by the plugin.
+
+[Unreleased]: https://github.com/kaiaberg/vergil.nvim/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/kaiaberg/vergil.nvim/releases/tag/v0.1.0
