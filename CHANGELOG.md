@@ -31,8 +31,22 @@ All notable changes are documented here. The format follows
 - `:Vergil snippet [both]` turns a ranged reference in the prompt into its
   lines (or adds them below), with `<Plug>(vergil-snippet)` and
   `<Plug>(vergil-snippet-both)`. Without a range it opens the selector.
-- `keymaps.preset = true` maps `gs`/`gb` to those in prompt buffers only;
-  there are no mappings by default.
+- `keymaps.preset = true` maps `gs`/`gb` to those in prompt buffers only,
+  and `<Esc>` to close an open preview (`K` or `:Vergil preview`, also when
+  focused), falling back to a normal `<Esc>`. Also available as
+  `<Plug>(vergil-close-preview)`. There are no mappings by default.
+- `/` completion for skills and commands: project (up to the repository
+  root), personal, enterprise, synced claude.ai skills and enabled plugins
+  (best effort), with descriptions, argument hints and origin; precedence
+  and naming follow Claude Code's own menu. Configurable extra items
+  (`skills.extra_items`) cover built-ins such as `/compact`.
+- Hover, go-to-definition, `:Vergil preview` and `:Vergil open` for `/skill`
+  tokens in the prompt.
+- `:q` in a file opened from the prompt (with `gd` or `:Vergil open`) returns
+  to the prompt instead of exiting Neovim and handing back to the agent
+  (`return_to_prompt`, on by default).
+- A YAML-frontmatter subset reader (quoted and block scalars) that never
+  breaks completion on malformed files.
 
 ### Removed
 

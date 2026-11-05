@@ -99,6 +99,42 @@ function M.maybe_enable(bufnr)
   end
 end
 
+local function is_normal_win(win)
+  return vim.api.nvim_win_get_config(win).relative == ""
+end
+
+--- On `:q` in the last window, when it shows something other than a prompt
+--- (e.g. a file opened with `gd`), reopens the prompt in a new window without
+--- moving focus. `:q` then closes only the current window and lands back in
+--- the prompt, instead of exiting Neovim and returning to the agent.
+--- Called from a QuitPre autocommand in plugin/vergil.lua.
+function M.on_quit_pre()
+  if not config.options.return_to_prompt then
+    return
+  end
+  local win = vim.api.nvim_get_current_win()
+  if sessions[vim.api.nvim_win_get_buf(win)] or #vim.api.nvim_list_tabpages() > 1 then
+    return
+  end
+  if #vim.tbl_filter(is_normal_win, vim.api.nvim_tabpage_list_wins(0)) > 1 then
+    return
+  end
+  -- Prefer the alternate buffer (where the jump came from), else any prompt.
+  local alt = vim.fn.bufnr("#")
+  local target = sessions[alt] and alt or nil
+  if not target then
+    for bufnr in pairs(sessions) do
+      if vim.api.nvim_buf_is_valid(bufnr) then
+        target = bufnr
+        break
+      end
+    end
+  end
+  if target then
+    vim.api.nvim_open_win(target, false, { split = "above", win = win })
+  end
+end
+
 --- Forgets a buffer that is being deleted, without firing events on it.
 ---@param bufnr integer
 function M.forget(bufnr)

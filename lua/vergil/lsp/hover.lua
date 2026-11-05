@@ -132,6 +132,38 @@ function M.contents(ref, root)
   return out
 end
 
+--- The skill token at a position and its definition, if known and not in
+--- fenced code.
+---@return { name: string, start_col: integer, end_col: integer }? token
+---@return vergil.Skill? skill
+function M.skill_at(session, row, col)
+  local lines = vim.api.nvim_buf_get_lines(session.bufnr, 0, -1, false)
+  if parser.fenced_lines(lines)[row + 1] then
+    return nil
+  end
+  local skills = require("vergil.skills")
+  local tok = skills.token_at(lines[row + 1] or "", col)
+  if not tok then
+    return nil
+  end
+  local skill = skills.find(session.root, tok.name)
+  if not skill then
+    return nil
+  end
+  return tok, skill
+end
+
+function M.skill_hover(session, row, col)
+  local tok, skill = M.skill_at(session, row, col)
+  if not tok or not skill then
+    return nil
+  end
+  return {
+    contents = { kind = "markdown", value = table.concat(require("vergil.skills").contents(skill, session.root), "\n") },
+    range = { start = { line = row, character = tok.start_col }, ["end"] = { line = row, character = tok.end_col } },
+  }
+end
+
 --- `textDocument/hover` result for a position, or nil.
 ---@param params table LSP HoverParams
 ---@param session vergil.Session
@@ -139,7 +171,7 @@ function M.handle(params, session)
   local row, col = params.position.line, params.position.character
   local ref = parser.at(parser.parse_buffer(session.bufnr), row, col)
   if not ref then
-    return nil
+    return M.skill_hover(session, row, col)
   end
   local contents = M.contents(ref, session.root)
   if not contents then

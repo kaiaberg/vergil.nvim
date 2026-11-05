@@ -20,6 +20,12 @@ vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile" }, {
     session.maybe_enable(ev.buf)
   end,
 })
+vim.api.nvim_create_autocmd("QuitPre", {
+  group = group,
+  callback = function()
+    session.on_quit_pre()
+  end,
+})
 vim.api.nvim_create_autocmd({ "BufDelete", "BufWipeout" }, {
   group = group,
   callback = function(ev)

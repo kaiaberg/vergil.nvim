@@ -41,7 +41,7 @@ end
 ---@return string[]
 function M.trigger_characters()
   local chars = { ".", "/", '"' }
-  for _, k in ipairs({ "attach", "mention" }) do
+  for _, k in ipairs({ "attach", "mention", "skills" }) do
     local c = config.options.triggers[k]:sub(-1)
     if not vim.tbl_contains(chars, c) then
       chars[#chars + 1] = c
@@ -180,6 +180,50 @@ local function build(file_list, token, ctx)
   return items
 end
 
+-- Keyword, not Function: engines add "()" to Function items (blink's
+-- auto_brackets, nvim-cmp autopairs integrations).
+local KIND_KEYWORD = 14
+
+local function skill_items(token, ctx)
+  local skills = require("vergil.skills")
+  local trigger = config.options.triggers.skills
+  local all = skills.items(ctx.root)
+  local by_name = {}
+  local names = {}
+  for _, it in ipairs(all) do
+    by_name[it.name] = it
+    names[#names + 1] = it.name
+  end
+  if token.query == "" then
+    table.sort(names)
+  end
+  local ranked = rank(names, token.query)
+  local range = {
+    start = { line = ctx.row, character = token.start_col },
+    ["end"] = { line = ctx.row, character = token.end_col },
+  }
+  local items = {}
+  for i, name in ipairs(ranked) do
+    local it = by_name[name]
+    local where = it.origin .. " " .. it.kind
+    local item = {
+      label = trigger .. name,
+      kind = KIND_KEYWORD,
+      labelDetails = { detail = it.argument_hint and (" " .. it.argument_hint) or nil, description = where },
+      documentation = { kind = "markdown", value = table.concat(skills.contents(it, ctx.root), "\n") },
+      filterText = ctx.typed,
+      sortText = ("%05d"):format(i),
+      -- Inserts the command only; whether it runs is Claude Code's concern.
+      textEdit = { range = range, newText = trigger .. name .. " " },
+    }
+    if native_011() then
+      item.detail = where
+    end
+    items[#items + 1] = item
+  end
+  return items
+end
+
 local EMPTY = { isIncomplete = false, items = {} }
 
 --- Handles a completion request. Calls `respond(result)` once, possibly
@@ -200,7 +244,12 @@ function M.handle(params, session, respond)
     token = M.existing_token(bufnr, row, col, session.root) or token
   end
   if not token then
-    return respond(EMPTY)
+    local skill_token = require("vergil.skills").typing_token(line, col)
+    if not skill_token then
+      return respond(EMPTY)
+    end
+    local ctx = { root = session.root, row = row, typed = line:sub(skill_token.start_col + 1, col) }
+    return respond({ isIncomplete = true, items = skill_items(skill_token, ctx) })
   end
   local ctx = { bufnr = bufnr, root = session.root, row = row, typed = line:sub(token.start_col + 1, col) }
   files.list(session.root, function(file_list)

@@ -54,8 +54,13 @@ function M.preview()
   end
   local parser = require("vergil.reference.parser")
   local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+  local hover = require("vergil.lsp.hover")
   local ref = parser.at(parser.parse_buffer(s.bufnr), row - 1, col)
-  local contents = ref and require("vergil.lsp.hover").contents(ref, s.root)
+  local contents = ref and hover.contents(ref, s.root)
+  if not contents and not ref then
+    local _, skill = hover.skill_at(s, row - 1, col)
+    contents = skill and require("vergil.skills").contents(skill, s.root)
+  end
   if not contents then
     return false, "no reference under the cursor"
   end
@@ -80,7 +85,11 @@ function M.open(how)
   local row, col = unpack(vim.api.nvim_win_get_cursor(0))
   local target, terr = require("vergil.lsp.definition").target_at(s.bufnr, row - 1, col, s.root)
   if not target then
-    return false, terr
+    local _, skill = require("vergil.lsp.hover").skill_at(s, row - 1, col)
+    if not (skill and skill.path) then
+      return false, terr
+    end
+    target = { abs = skill.path, line = 1, type = "file" }
   end
   vim.cmd({ cmd = how and OPEN_CMDS[how] or "edit", args = { target.abs }, magic = { file = false } })
   if target.type == "file" then

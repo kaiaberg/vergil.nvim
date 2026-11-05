@@ -10,11 +10,13 @@ local M = {}
 ---@field root string? explicit session root; defaults to Neovim's startup cwd
 ---@field activation { filename_patterns: string[]? } nil patterns = adapter default
 ---@field mention { format: "github"|"colon"|vergil.MentionTemplates }
----@field triggers { attach: string, mention: string, range: string } completion and selector triggers
+---@field triggers { attach: string, mention: string, range: string, skills: string } completion and selector triggers
+---@field skills { extra_items: { name: string, description: string?, argument_hint: string? }[] }
 ---@field selector { keys: { mention: string, snippet: string, both: string, cancel: string[] } }
 ---@field completion { native: boolean, reopen_on_backspace: boolean }
 ---@field files { command: string[]? } custom discovery command, run in the root
 ---@field keymaps { preset: boolean } opt-in buffer-local mappings in prompt buffers
+---@field return_to_prompt boolean `:q` in a file opened from the prompt returns to the prompt
 
 ---@type vergil.Config
 M.defaults = {
@@ -22,7 +24,10 @@ M.defaults = {
   root = nil,
   activation = { filename_patterns = nil },
   mention = { format = "github" },
-  triggers = { attach = "@", mention = "@@", range = "#" },
+  triggers = { attach = "@", mention = "@@", range = "#", skills = "/" },
+  -- Extra `/` items, e.g. built-in commands vergil doesn't discover:
+  -- { { name = "compact", description = "Summarize the conversation" } }
+  skills = { extra_items = {} },
   selector = {
     -- Buffer-local keys in the line selector. Motions are never remapped.
     keys = { mention = "<CR>", snippet = "gs", both = "gb", cancel = { "q", "<Esc>" } },
@@ -36,8 +41,11 @@ M.defaults = {
   },
   files = { command = nil },
   -- No mappings by default. `preset = true` maps, in prompt buffers only:
-  -- gs = :Vergil snippet, gb = :Vergil snippet both.
+  -- gs = :Vergil snippet, gb = :Vergil snippet both, <Esc> = close preview.
   keymaps = { preset = false },
+  -- `:q` in the last window, showing a file opened from the prompt (e.g.
+  -- with `gd`), returns to the prompt instead of exiting Neovim.
+  return_to_prompt = true,
 }
 
 ---@type vergil.Config
@@ -56,6 +64,7 @@ function M.set(opts)
   vim.validate("files", opts.files, "table", true)
   vim.validate("selector", opts.selector, "table", true)
   vim.validate("keymaps", opts.keymaps, "table", true)
+  vim.validate("return_to_prompt", opts.return_to_prompt, "boolean", true)
   if opts.triggers and opts.triggers.range ~= nil then
     vim.validate("triggers.range", opts.triggers.range, "string")
     if vim.fn.strchars(opts.triggers.range) ~= 1 or opts.triggers.range:find("%s") then
@@ -65,7 +74,16 @@ function M.set(opts)
   if opts.files then
     vim.validate("files.command", opts.files.command, "table", true)
   end
-  for _, k in ipairs({ "attach", "mention" }) do
+  vim.validate("skills", opts.skills, "table", true)
+  if opts.skills then
+    vim.validate("skills.extra_items", opts.skills.extra_items, "table", true)
+    for i, it in ipairs(opts.skills.extra_items or {}) do
+      if type(it) ~= "table" or type(it.name) ~= "string" or it.name == "" then
+        error(("vergil: skills.extra_items[%d] needs a name"):format(i), 0)
+      end
+    end
+  end
+  for _, k in ipairs({ "attach", "mention", "skills" }) do
     local t = opts.triggers and opts.triggers[k]
     vim.validate("triggers." .. k, t, "string", true)
     if t and (t == "" or t:find("%s")) then

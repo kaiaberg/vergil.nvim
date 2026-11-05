@@ -33,8 +33,13 @@ end
 ---@param params table LSP DefinitionParams
 ---@param session vergil.Session
 function M.handle(params, session)
-  local t = M.target_at(session.bufnr, params.position.line, params.position.character, session.root)
+  local row, col = params.position.line, params.position.character
+  local t = M.target_at(session.bufnr, row, col, session.root)
   if not t then
+    local _, skill = hover.skill_at(session, row, col)
+    if skill and skill.path then
+      return { uri = vim.uri_from_fname(skill.path), range = { start = { line = 0, character = 0 }, ["end"] = { line = 0, character = 0 } } }
+    end
     return nil
   end
   local line = math.max(0, t.line - 1)

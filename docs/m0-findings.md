@@ -47,6 +47,28 @@ Still open, since they don't affect the grammar: how reliably Claude interprets
    attach an unrelated file named `Decorator`. That's rare, and the new
    diagnostic covers it, so no escaping is needed. Never rewrite the snippet.
 
+## Skills and commands (M4)
+
+Checked against https://code.claude.com/docs/en/skills and against Claude
+Code 2.1.318's own `/` menu, using test files in a scratch project.
+
+| Question | Docs | Observed in the menu | vergil |
+|---|---|---|---|
+| Project skill locations | Start directory and every parent up to the repository root | – | Same |
+| Precedence | Enterprise > personal > project; skill > command | Skill and command with the same name are **both listed**, skill first | One item per name, the winner; hover lists what it overrides |
+| Command subdirectories | Not documented | `commands/sub/deep.md` is `/sub:deep` | Same |
+| `name` frontmatter | Overrides the directory name (skills only) | Confirmed | Same |
+| No description | Not documented | First non-empty body line, `#` stripped | Same |
+| `user-invocable: false` | "Hidden from the `/` menu" (from a page summary) | **Listed** | Listed, flag shown in hover |
+| `disable-model-invocation: true` | Only the user can invoke it | Listed | Listed |
+| Folded block scalar `>` | – | Parsed | Parsed |
+| `argument-hint`, `when_to_use` | – | Not shown in the menu | Hint shown in completion and hover |
+| Synced claude.ai skills | Not documented | Bare name (`/xlsx`); `/anthropic-skills:<name>` when the name is taken | Same (best effort) |
+| Plugin skills | Always `/<plugin>:<skill>` | No plugins enabled here | Best effort via `enabledPlugins` and marketplace manifests |
+
+Engine note: completion items for skills use the Keyword kind, because
+engines add `()` to Function items (blink's auto-brackets).
+
 ## Prototype gate (plan §7.1)
 
 The prototype is in `prototype/m0/`: an in-process server (`vim.lsp.start` with
