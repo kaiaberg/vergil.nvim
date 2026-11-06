@@ -105,6 +105,18 @@ function M.define_plugs()
   for name, p in pairs(plugs) do
     vim.keymap.set("n", ("<Plug>(vergil-%s)"):format(name), p[1], { desc = "vergil: " .. p[2] })
   end
+  -- Send lines from a file to the prompt: the Visual selection, or the
+  -- cursor line in Normal mode.
+  for suffix, action in pairs({ [""] = "mention", ["-snippet"] = "snippet", ["-both"] = "both" }) do
+    vim.keymap.set({ "n", "x" }, "<Plug>(vergil-send" .. suffix .. ")", function()
+      local send = require("vergil.send")
+      local line1, line2 = send.selected_lines()
+      local ok, err = send.send(action, line1, line2)
+      if not ok then
+        notify(err)
+      end
+    end, { desc = "vergil: send lines to the prompt (" .. action .. ")" })
+  end
   for _, kind in ipairs({ "attach", "mention", "skills" }) do
     vim.keymap.set("i", ("<Plug>(vergil-pick-%s)"):format(kind), function()
       local ok, err = require("vergil.picker").pick(kind)
@@ -135,6 +147,43 @@ local function on_win_enter(prompt_bufnr)
   end
 end
 
+--- With the preset, Visual-mode keys in file buffers (not prompts) send the
+--- selection to the prompt. They are the line selector's keys, and are only
+--- mapped in a Neovim that has a prompt open.
+---@param bufnr integer
+function M.attach_source(bufnr)
+  local config = require("vergil.config")
+  if not config.options.keymaps.preset or vim.b[bufnr].vergil_send_keys then
+    return
+  end
+  local session = require("vergil.session")
+  if session.is_enabled(bufnr) or vim.bo[bufnr].buftype ~= "" or vim.api.nvim_buf_get_name(bufnr) == "" then
+    return
+  end
+  vim.b[bufnr].vergil_send_keys = true
+  local keys = config.options.selector.keys
+  for action, plug in pairs({ mention = "<Plug>(vergil-send)", snippet = "<Plug>(vergil-send-snippet)", both = "<Plug>(vergil-send-both)" }) do
+    vim.keymap.set("x", keys[action], plug, { buffer = bufnr, remap = true, desc = "vergil: send the selection to the prompt (" .. action .. ")" })
+  end
+end
+
+local watching_sources = false
+
+--- Starts mapping the send keys in file buffers once the first prompt opens.
+function M.watch_sources()
+  if watching_sources then
+    return
+  end
+  watching_sources = true
+  vim.api.nvim_create_autocmd("BufEnter", {
+    group = group,
+    callback = function(ev)
+      M.attach_source(ev.buf)
+    end,
+    desc = "vergil: send keys in files opened from the prompt",
+  })
+end
+
 ---@param bufnr integer
 function M.attach(bufnr)
   if not require("vergil.config").options.keymaps.preset then
@@ -143,6 +192,7 @@ function M.attach(bufnr)
   for _, m in ipairs(M.preset) do
     vim.keymap.set("n", m.lhs, m.plug, { buffer = bufnr, remap = true, desc = "vergil: " .. m.desc })
   end
+  M.watch_sources()
   vim.api.nvim_create_autocmd("WinEnter", {
     group = group,
     callback = function()

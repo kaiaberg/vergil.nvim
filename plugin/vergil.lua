@@ -46,6 +46,7 @@ vim.api.nvim_create_user_command("Vergil", function(opts)
   require("vergil.commands").run(opts)
 end, {
   nargs = "+",
+  range = true, -- :'<,'>Vergil send
   desc = "vergil.nvim",
   complete = function(arglead, cmdline)
     return require("vergil.commands").complete(arglead, cmdline)

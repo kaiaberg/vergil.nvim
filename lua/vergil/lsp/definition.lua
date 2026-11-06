@@ -42,6 +42,7 @@ function M.handle(params, session)
     end
     return nil
   end
+  session.jump = { row = row, col = col, abs = t.abs } -- for :Vergil send
   local line = math.max(0, t.line - 1)
   return {
     uri = vim.uri_from_fname(t.abs),

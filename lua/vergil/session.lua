@@ -11,6 +11,7 @@ local M = {}
 ---@field bufnr integer
 ---@field root string
 ---@field agent string
+---@field jump { row: integer, col: integer, abs: string }? reference last opened with `gd` or `:Vergil open` (0-based)
 
 local sessions = {} ---@type table<integer, vergil.Session>
 --- The prompt file's bytes when vergil first saw it, for `:Vergil abort`.
@@ -57,6 +58,34 @@ end
 ---@return boolean
 function M.is_enabled(bufnr)
   return M.get(bufnr) ~= nil
+end
+
+--- The prompt buffer: the current buffer if it is one, else the alternate,
+--- else the only enabled buffer.
+---@return integer? bufnr
+---@return string? err
+function M.find_prompt()
+  local cur = vim.api.nvim_get_current_buf()
+  if M.is_enabled(cur) then
+    return cur
+  end
+  local alt = vim.fn.bufnr("#")
+  if alt > 0 and M.is_enabled(alt) then
+    return alt
+  end
+  local found
+  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+    if M.is_enabled(bufnr) then
+      if found then
+        return nil, "several prompt buffers are open; run this from the one you mean"
+      end
+      found = bufnr
+    end
+  end
+  if not found then
+    return nil, "no prompt buffer (use :Vergil enable)"
+  end
+  return found
 end
 
 --- Enables vergil in a buffer. Idempotent.

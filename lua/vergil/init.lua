@@ -91,6 +91,7 @@ function M.open(how)
     end
     target = { abs = skill.path, line = 1, type = "file" }
   end
+  s.jump = { row = row - 1, col = col, abs = target.abs } -- for :Vergil send
   vim.cmd({ cmd = how and OPEN_CMDS[how] or "edit", args = { target.abs }, magic = { file = false } })
   if target.type == "file" then
     local last = vim.api.nvim_buf_line_count(0)

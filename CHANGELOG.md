@@ -13,6 +13,10 @@ All notable changes are documented here. The format follows
 - `make verify` runs the Claude Code checks and records the version they
   passed with.
 - Tests run on GitHub for Neovim 0.11.7, stable and nightly.
+- `:Vergil send [snippet|both]`: select lines in a file opened with `gd` and
+  send them back to the prompt as a mention, snippet or both. The first send
+  replaces the reference you opened. With the preset, `<CR>`, `gs` and `gb`
+  in Visual mode, in files only, while a prompt is open.
 - README and `:help vergil-ahead-of-time`: drafting prompts without a running
   agent.
 

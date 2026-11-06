@@ -18,35 +18,6 @@ M.exit = function(cmd)
   vim.cmd(cmd)
 end
 
---- The prompt buffer: the current buffer if it is one, else the alternate,
---- else the only enabled buffer.
----@return integer? bufnr
----@return string? err
-local function prompt_buffer()
-  local session = require("vergil.session")
-  local cur = vim.api.nvim_get_current_buf()
-  if session.is_enabled(cur) then
-    return cur
-  end
-  local alt = vim.fn.bufnr("#")
-  if alt > 0 and session.is_enabled(alt) then
-    return alt
-  end
-  local found
-  for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
-    if session.is_enabled(bufnr) then
-      if found then
-        return nil, "several prompt buffers are open; run this from the one to submit"
-      end
-      found = bufnr
-    end
-  end
-  if not found then
-    return nil, "no prompt buffer (use :Vergil enable)"
-  end
-  return found
-end
-
 local function close_floats()
   require("vergil.ui.selector").cancel_active()
   for _, win in ipairs(vim.api.nvim_list_wins()) do
@@ -110,7 +81,7 @@ end
 ---@return boolean ok
 ---@return string? err
 function M.submit()
-  local bufnr, err = prompt_buffer()
+  local bufnr, err = require("vergil.session").find_prompt()
   if not bufnr then
     return false, err
   end
@@ -131,7 +102,7 @@ end
 ---@return boolean ok
 ---@return string? err
 function M.abort()
-  local bufnr, err = prompt_buffer()
+  local bufnr, err = require("vergil.session").find_prompt()
   if not bufnr then
     return false, err
   end

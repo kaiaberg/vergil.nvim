@@ -5,7 +5,7 @@ local function notify(msg, level)
   vim.notify("vergil: " .. msg, level or vim.log.levels.INFO)
 end
 
----@type table<string, fun(args: string[])>
+---@type table<string, fun(args: string[], opts: table)>
 M.subcommands = {
   enable = function()
     require("vergil.session").enable(0)
@@ -55,6 +55,12 @@ M.subcommands = {
       notify(err, vim.log.levels.WARN)
     end
   end,
+  send = function(args, opts)
+    local ok, err = require("vergil.send").send(args[1], opts.line1, opts.line2)
+    if not ok then
+      notify(err, vim.log.levels.WARN)
+    end
+  end,
   toggle = function()
     local ok, err = require("vergil").toggle()
     if not ok then
@@ -63,7 +69,7 @@ M.subcommands = {
   end,
 }
 
----@param opts { fargs: string[] }
+---@param opts { fargs: string[], line1: integer, line2: integer }
 function M.run(opts)
   local name = opts.fargs[1]
   local sub = name and M.subcommands[name]
@@ -74,7 +80,7 @@ function M.run(opts)
     )
     return
   end
-  sub(vim.list_slice(opts.fargs, 2))
+  sub(vim.list_slice(opts.fargs, 2), opts)
 end
 
 ---@return string[]
@@ -97,6 +103,11 @@ function M.complete(arglead, cmdline)
     return vim.tbl_filter(function(n)
       return vim.startswith(n, arglead)
     end, { "attach", "mention", "skills" })
+  end
+  if cmdline:match("^%s*%S+%s+send%s+%S*$") then
+    return vim.tbl_filter(function(n)
+      return vim.startswith(n, arglead)
+    end, { "snippet", "both" })
   end
   if cmdline:match("^%s*%S+%s+snippet%s+%S*$") then
     return vim.tbl_filter(function(n)

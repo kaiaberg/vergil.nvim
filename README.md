@@ -135,6 +135,11 @@ the start of the file. On a `/skill` it shows the skill's description. `gd`
 opens the target at its line, and `:Vergil open split|vsplit|tab` opens it
 elsewhere. `:q` in a file opened this way brings you back to the prompt.
 
+**Send lines back.** In a file opened with `gd`, select lines with any motion
+and run `:'<,'>Vergil send` (`<CR>` in Visual mode with the preset; `gs` sends
+a snippet, `gb` both). The reference you opened becomes a ranged mention, and
+you're back in the prompt. `<C-^>` returns to the file for more.
+
 **Fix what vergil flags.** Diagnostics point out files attached twice,
 large attachments, line ranges past the end of a file, and missing files. `gra` offers fixes: convert an attachment to a mention,
 replace a ranged mention with its snippet, or select lines.
@@ -232,6 +237,7 @@ will open.
 | `:Vergil open [split\|vsplit\|tab]` | Open the target at its line |
 | `:Vergil range` | Select lines for the reference under the cursor |
 | `:Vergil snippet [both]` | Replace a ranged reference with its lines (`both`: keep it, add the lines below) |
+| `:Vergil send [snippet\|both]` | Send the cursor line, or a range (`:'<,'>`), of the current file to the prompt as a mention, snippet or both |
 | `:Vergil toggle` | Convert between attachment and mention |
 | `:Vergil pick [attach\|mention\|skills]` | Full-size picker: `Enter` inserts, `<C-t>` switches type, `<C-r>` selects lines |
 | `:Vergil submit` | Write the prompt, settle other modified buffers, exit |
@@ -250,7 +256,9 @@ vergil maps nothing unless you ask. Every action has a `<Plug>` mapping:
 `<Plug>(vergil-open-split)`, `<Plug>(vergil-open-vsplit)`,
 `<Plug>(vergil-open-tab)`, `<Plug>(vergil-submit)`, `<Plug>(vergil-abort)`,
 `<Plug>(vergil-pick-attach)`, `<Plug>(vergil-pick-mention)`,
-`<Plug>(vergil-pick-skills)` and `<Plug>(vergil-close-preview)`.
+`<Plug>(vergil-pick-skills)`, `<Plug>(vergil-close-preview)`, and
+`<Plug>(vergil-send)`, `<Plug>(vergil-send-snippet)` and
+`<Plug>(vergil-send-both)` (Normal and Visual mode).
 
 `keymaps = { preset = true }` maps these in prompt buffers only:
 
@@ -260,6 +268,10 @@ vergil maps nothing unless you ask. Every action has a `<Plug>` mapping:
 | `gf` / `<C-w>f` / `<C-w>gf` | Open the reference here / in a split / in a tab; the native key elsewhere |
 | `ZZ` / `ZQ` | `:Vergil submit` / `:Vergil abort` |
 | `<Esc>` | Close an open preview (also inside it); a normal `<Esc>` otherwise |
+
+and, in Visual mode in other files while a prompt is open, the line
+selector's keys: `<CR>` sends the selection as a mention, `gs` as a snippet,
+`gb` both.
 
 ## Configuration
 

@@ -199,6 +199,21 @@ shows the description and where it's defined.
 `return_to_prompt` (default), `:q` in a file opened this way returns to the
 prompt instead of exiting Neovim and handing back to Claude Code.
 
+                                                                *vergil-send*
+The way back: select lines in the opened file itself, with any motion, text
+object or search, and send them to the prompt with |:Vergil-send| (or <CR>,
+`gs` and `gb` in Visual mode with the preset, the line selector's keys). They
+arrive as a mention, a snippet or both, as from the line selector, and the
+prompt is shown again.
+
+The first send after `gd` or |:Vergil-open| replaces the reference you
+opened, so `@file` becomes `` `file#L12-L35` ``. Later sends go after the
+prompt's cursor, after a reference rather than inside it, with spaces as
+needed. |CTRL-^| goes back to the file for another selection. Files outside
+the root are sent with their full path. If the file has unsaved changes,
+the lines are sent as you see them, with a warning: the agent reads the file
+on disk.
+
 ==============================================================================
 8. DIAGNOSTICS AND CODE ACTIONS                           *vergil-diagnostics*
 
@@ -251,6 +266,11 @@ prompt from before `Ctrl+G`, even if it was written in between.
     `both`, keep it and add the lines below. Without a range, opens the line
     selector.
 
+:[range]Vergil send [snippet|both]                         *:Vergil-send*
+    Send [range] lines (default: the cursor line) of the current file to
+    the prompt as a mention; `snippet` sends a verbatim snippet and `both`
+    sends the two. See |vergil-send|.
+
 :Vergil toggle                                           *:Vergil-toggle*
     Convert the reference under the cursor between attachment and mention.
 
@@ -282,9 +302,11 @@ vergil maps nothing by default. Normal-mode <Plug> mappings:
   <Plug>(vergil-open-vsplit)    <Plug>(vergil-open-tab)
   <Plug>(vergil-submit)         <Plug>(vergil-abort)
   <Plug>(vergil-pick-attach)    <Plug>(vergil-pick-mention)
-  <Plug>(vergil-pick-skills)
+  <Plug>(vergil-pick-skills)    <Plug>(vergil-send)
+  <Plug>(vergil-send-snippet)   <Plug>(vergil-send-both)
 
-The pick mappings also exist in Insert mode.
+The pick mappings also exist in Insert mode. The send mappings also exist in
+Visual mode, where they send the selected lines.
 
                                                         *vergil-keymap-preset*
 `keymaps = { preset = true }` maps, in prompt buffers only:
@@ -298,6 +320,13 @@ The pick mappings also exist in Insert mode.
   ZQ        |:Vergil-abort|
   <Esc>     Close an open preview, also when focused; a normal <Esc>
             otherwise
+
+and, in Visual mode in other file buffers while a prompt is open, the line
+selector's keys (`selector.keys`):
+
+  <CR>      Send the selected lines to the prompt as a mention
+  gs        Send them as a snippet
+  gb        Send both
 
 ==============================================================================
 12. CONFIGURATION                                              *vergil-config*
