@@ -6,6 +6,14 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-06
+
+Send lines back from files, reference functions by name, and review git
+changes, while depending less on Claude Code's undocumented behaviour.
+Behaviour changes: the large-attachment diagnostic is now Info instead of
+Warning, and `:Vergil abort` writes the prompt file back before exiting.
+Verified against Claude Code 2.1.319.
+
 ### Added
 
 - `:checkhealth vergil` shows the agent's version and which version vergil's
@@ -43,6 +51,11 @@ All notable changes are documented here. The format follows
   installed.
 - Version-specific Claude Code behaviour is collected under "Observed
   behaviour" in the README and `:help vergil-observed`.
+
+### Fixed
+
+- Text inserted by `:Vergil pick` gets a space after it when needed, so an
+  attachment no longer runs into the following word.
 
 ## [0.1.0] - 2026-11-05
 
@@ -112,5 +125,6 @@ First release: a Vim-native toolkit for writing Claude Code prompts in the
 
 - The M0 prototype, superseded by the plugin.
 
-[Unreleased]: https://github.com/kaiaberg/vergil.nvim/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kaiaberg/vergil.nvim/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kaiaberg/vergil.nvim/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kaiaberg/vergil.nvim/releases/tag/v0.1.0
