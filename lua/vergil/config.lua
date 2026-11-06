@@ -9,10 +9,10 @@ local M = {}
 ---@field agent string adapter name under `vergil.adapters`
 ---@field root string? explicit session root; defaults to Neovim's startup cwd
 ---@field activation { filename_patterns: string[]? } nil patterns = adapter default
----@field mention { format: "github"|"colon"|vergil.MentionTemplates }
+---@field mention { format: "github"|"colon"|vergil.MentionTemplates, symbols: boolean }
 ---@field triggers { attach: string, mention: string, range: string, skills: string } completion and selector triggers
 ---@field skills { extra_items: { name: string, description: string?, argument_hint: string? }[] }
----@field selector { keys: { mention: string, snippet: string, both: string, cancel: string[] } }
+---@field selector { keys: { mention: string, snippet: string, both: string, symbols: string, cancel: string[] } }
 ---@field completion { native: boolean, reopen_on_backspace: boolean }
 ---@field files { command: string[]? } custom discovery command, run in the root
 ---@field keymaps { preset: boolean } opt-in buffer-local mappings in prompt buffers
@@ -25,14 +25,17 @@ M.defaults = {
   agent = "claude",
   root = nil,
   activation = { filename_patterns = nil },
-  mention = { format = "github" },
+  -- symbols: add the function or class name after a range that covers
+  -- exactly one, e.g. `a.lua#L3-L9` (`M.apply`), so drift can be flagged.
+  mention = { format = "github", symbols = true },
   triggers = { attach = "@", mention = "@@", range = "#", skills = "/" },
   -- Extra `/` items, e.g. built-in commands vergil doesn't discover:
   -- { { name = "compact", description = "Summarize the conversation" } }
   skills = { extra_items = {} },
   selector = {
     -- Buffer-local keys in the line selector. Motions are never remapped.
-    keys = { mention = "<CR>", snippet = "gs", both = "gb", cancel = { "q", "<Esc>" } },
+    -- `symbols` lists the file's functions and classes to select from.
+    keys = { mention = "<CR>", snippet = "gs", both = "gb", symbols = "gO", cancel = { "q", "<Esc>" } },
   },
   completion = {
     -- Enable Neovim's built-in LSP completion in prompt buffers. Leave off
@@ -66,6 +69,7 @@ M.defaults = {
       missing_mention = "warn",
       missing_attachment = "info", -- pasted text may contain @words
       fenced = "hint", -- @file inside fenced code may still be attached
+      symbol = "warn", -- `a.lua#L3-L9` (`M.apply`): the range no longer matches
     },
   },
 }
@@ -81,6 +85,9 @@ function M.set(opts)
   vim.validate("root", opts.root, "string", true)
   vim.validate("activation", opts.activation, "table", true)
   vim.validate("mention", opts.mention, "table", true)
+  if opts.mention then
+    vim.validate("mention.symbols", opts.mention.symbols, "boolean", true)
+  end
   vim.validate("triggers", opts.triggers, "table", true)
   vim.validate("completion", opts.completion, "table", true)
   vim.validate("files", opts.files, "table", true)

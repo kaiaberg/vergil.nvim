@@ -134,4 +134,16 @@ function M.attachment(path, adapter)
   return adapter.attachment(path)
 end
 
+--- A mention followed by the symbol it covers: `` `a.lua#L3-L9` (`M.apply`) ``.
+--- Without a usable name, the mention alone.
+---@param mention string
+---@param symbol string?
+---@return string
+function M.with_symbol(mention, symbol)
+  if not symbol or symbol == "" or symbol:find("`", 1, true) then
+    return mention
+  end
+  return ("%s (`%s`)"):format(mention, symbol)
+end
+
 return M

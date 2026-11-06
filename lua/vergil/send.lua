@@ -124,12 +124,17 @@ function M.send(action, line1, line2)
   end
   local lines = vim.api.nvim_buf_get_lines(src, line1 - 1, line2, false)
   local modified = vim.bo[src].modified
+  local symbol
+  if require("vergil.config").options.mention.symbols then
+    local symbols = require("vergil.symbols")
+    symbol = symbols.exact(symbols.list(vim.api.nvim_buf_get_lines(src, 0, -1, false), abs), line1, line2)
+  end
 
   local win = show_prompt(prompt)
   local ref, span = target_span(s, win, abs, path, action)
   require("vergil.range").apply(
     { bufnr = prompt, win = win, ref = ref, span = span, from_insert = false },
-    { action = action, start_line = line1, end_line = line2, lines = lines },
+    { action = action, start_line = line1, end_line = line2, lines = lines, symbol = symbol and symbol.name },
     abs
   )
   if modified then

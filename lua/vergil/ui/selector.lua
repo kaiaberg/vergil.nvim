@@ -27,6 +27,7 @@ end
 ---@field start_line integer
 ---@field end_line integer
 ---@field lines string[] the selected source lines, verbatim
+---@field symbol string? the function or class the lines cover exactly
 
 ---@class vergil.SelectorOpts
 ---@field abs string absolute path of the file
@@ -65,10 +66,11 @@ function M.open(opts)
   vim.bo[bufnr].modified = false
   highlight(bufnr, opts.abs)
 
-  local footer = (" %s mention · %s snippet · %s both · %s cancel "):format(
+  local footer = (" %s mention · %s snippet · %s both · %s symbols · %s cancel "):format(
     key_label(keys.mention),
     key_label(keys.snippet),
     key_label(keys.both),
+    key_label(keys.symbols),
     table.concat(vim.tbl_map(key_label, keys.cancel), "/")
   )
   local win = float.open(bufnr, { width = 0.85, height = 0.8, title = " " .. opts.title .. " ", footer = footer })
@@ -77,6 +79,16 @@ function M.open(opts)
   vim.wo[win].wrap = false
 
   local finished = false
+  local picking = false -- a symbol list is open; leaving the window is fine
+  local symbol_list ---@type vergil.Symbol[]|false|nil
+  local symbol_err ---@type string?
+  local function file_symbols()
+    if symbol_list == nil then
+      symbol_list, symbol_err = require("vergil.symbols").list(opts.lines, opts.abs)
+      symbol_list = symbol_list or false
+    end
+    return symbol_list or nil, symbol_err
+  end
   local function close()
     if vim.api.nvim_win_is_valid(win) then
       vim.api.nvim_win_close(win, true)
@@ -101,8 +113,12 @@ function M.open(opts)
       s, e = e, s
     end
     local lines = vim.list_slice(opts.lines, s, e)
+    local symbol
+    if config.options.mention.symbols then
+      symbol = require("vergil.symbols").exact(file_symbols(), s, e)
+    end
     close()
-    opts.on_done({ action = action, start_line = s, end_line = e, lines = lines })
+    opts.on_done({ action = action, start_line = s, end_line = e, lines = lines, symbol = symbol and symbol.name })
   end
 
   local function act(action)
@@ -130,14 +146,61 @@ function M.open(opts)
     map("n", lhs, cancel, "cancel")
   end
 
+  --- Selects a symbol's lines, ready for mention, snippet or both.
+  local function select_lines(s, e)
+    if not vim.api.nvim_win_is_valid(win) then
+      return
+    end
+    vim.api.nvim_set_current_win(win)
+    if vim.api.nvim_get_mode().mode:match("^[vV\22]") then
+      vim.cmd.normal({ vim.keycode("<Esc>"), bang = true })
+    end
+    vim.api.nvim_win_set_cursor(win, { s, 0 })
+    vim.cmd("normal! V" .. (e > s and (e - s) .. "j" or ""))
+  end
+  map({ "n", "x" }, keys.symbols, function()
+    local list, err = file_symbols()
+    if not list or #list == 0 then
+      vim.notify("vergil: " .. (err or "no functions or classes found"), vim.log.levels.INFO)
+      return
+    end
+    local width = 0
+    for _, sym in ipairs(list) do
+      width = math.max(width, sym.depth * 2 + #sym.name)
+    end
+    picking = true
+    vim.ui.select(list, {
+      prompt = "Symbols",
+      kind = "vergil.symbols",
+      format_item = function(sym)
+        local label = ("  "):rep(sym.depth) .. sym.name
+        return ("%s%s  L%d-L%d"):format(label, (" "):rep(width - #label), sym.start_line, sym.end_line)
+      end,
+    }, function(choice)
+      picking = false
+      if finished then
+        return
+      end
+      if choice then
+        select_lines(choice.start_line, choice.end_line)
+      elseif vim.api.nvim_win_is_valid(win) then
+        vim.api.nvim_set_current_win(win)
+      end
+    end)
+  end, "list functions and classes")
+
   active_cancel = cancel
 
-  -- Closing or leaving the window any other way counts as cancelling.
+  -- Closing or leaving the window any other way counts as cancelling,
+  -- except leaving it for the symbol list.
   vim.api.nvim_create_autocmd({ "WinClosed", "WinLeave" }, {
     buffer = bufnr,
-    once = true,
-    callback = function()
+    callback = function(ev)
+      if ev.event == "WinLeave" and picking then
+        return
+      end
       vim.schedule(cancel)
+      return true
     end,
   })
 

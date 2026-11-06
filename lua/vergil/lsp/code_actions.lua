@@ -6,6 +6,7 @@
 --- or depend on the file's current contents.
 local config = require("vergil.config")
 local convert = require("vergil.reference.convert")
+local formatter = require("vergil.reference.formatter")
 local diagnostics = require("vergil.lsp.diagnostics")
 local parser = require("vergil.reference.parser")
 local resolver = require("vergil.reference.resolver")
@@ -78,6 +79,24 @@ function M.handle(params, session)
             isPreferred = #fixes > 0 or nil,
             edit = text_edit(uri, edit),
           }
+        end
+        local drift = diagnostics.symbol_drift(session.bufnr, ref, target)
+        if drift and not drift.missing then
+          local mention = formatter.mention(ref.path, drift.start_line, drift.end_line, config.options.mention.format)
+          if mention then
+            local where = drift.start_line == drift.end_line and ("L%d"):format(drift.start_line)
+              or ("L%d-L%d"):format(drift.start_line, drift.end_line)
+            local fixes = vim.tbl_filter(function(d)
+              return d.code == "symbol" and d.range.start.line == ref.span.start_row and d.range.start.character == ref.span.start_col
+            end, params.context and params.context.diagnostics or {})
+            actions[#actions + 1] = {
+              title = ("Update range to %s"):format(where),
+              kind = "quickfix",
+              diagnostics = #fixes > 0 and fixes or nil,
+              isPreferred = true,
+              edit = text_edit(uri, { span = ref.span, text = mention }),
+            }
+          end
         end
         if target and target.exists and target.type == "file" then
           local pos = { uri, ref.span.start_row, ref.span.start_col }

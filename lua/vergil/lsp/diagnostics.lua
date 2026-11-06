@@ -11,9 +11,12 @@
 --- - Ordinary inline code that merely might be a path is never flagged.
 --- - Attachment size is estimated in tokens (bytes / 3); agents tend to limit
 ---   tokens, not bytes.
+--- - A ranged mention followed by `` (`name`) `` is checked against the
+---   file's symbols, so a range that drifted from its function is flagged.
 local config = require("vergil.config")
 local parser = require("vergil.reference.parser")
 local resolver = require("vergil.reference.resolver")
+local symbols = require("vergil.symbols")
 
 local M = {}
 
@@ -29,6 +32,66 @@ local function human_size(n)
     return ("%.0f KB"):format(n / 1024)
   end
   return ("%.1f MB"):format(n / 1024 / 1024)
+end
+
+local symbol_cache = {} ---@type table<string, { stamp: string, list: vergil.Symbol[]|false }>
+
+--- A file's symbols, re-parsed only when its modification time or size changes.
+---@param abs string
+---@return vergil.Symbol[]?
+local function file_symbols(abs)
+  local stat = vim.uv.fs_stat(abs)
+  if not stat or stat.type ~= "file" or stat.size > 1024 * 1024 then
+    return nil
+  end
+  local stamp = ("%d:%d:%d"):format(stat.mtime.sec, stat.mtime.nsec, stat.size)
+  local cached = symbol_cache[abs]
+  if cached and cached.stamp == stamp then
+    return cached.list or nil
+  end
+  local ok, lines = pcall(vim.fn.readfile, abs)
+  local list = ok and symbols.list(lines, abs) or nil
+  symbol_cache[abs] = { stamp = stamp, list = list or false }
+  return list
+end
+
+--- The name in `` (`name`) `` right after a reference, if any.
+---@param bufnr integer
+---@param ref vergil.Reference
+---@return string?
+function M.symbol_after(bufnr, ref)
+  local line = vim.api.nvim_buf_get_lines(bufnr, ref.span.end_row, ref.span.end_row + 1, false)[1] or ""
+  return line:sub(ref.span.end_col + 1):match("^ %(`([^`]+)`%)")
+end
+
+---@class vergil.SymbolDrift
+---@field name string
+---@field missing boolean? the file no longer has a symbol of that name
+---@field start_line integer? where the symbol is now
+---@field end_line integer?
+
+--- Whether a named ranged mention no longer matches its symbol.
+---@param bufnr integer
+---@param ref vergil.Reference
+---@param target vergil.Target
+---@return vergil.SymbolDrift?
+function M.symbol_drift(bufnr, ref, target)
+  if ref.mode ~= "mention" or not ref.start_line or not target or not target.exists or target.type ~= "file" then
+    return nil
+  end
+  local name = M.symbol_after(bufnr, ref)
+  local list = name and file_symbols(target.abs)
+  if not list then
+    return nil -- no name, or no parser for the language
+  end
+  local sym = symbols.find(list, name)
+  if not sym then
+    return { name = name, missing = true }
+  end
+  if sym.start_line == ref.start_line and sym.end_line == ref.end_line then
+    return nil
+  end
+  return { name = name, start_line = sym.start_line, end_line = sym.end_line }
 end
 
 local function lsp_range(span)
@@ -101,8 +164,17 @@ function M.compute(session)
         end
       end
     elseif ref.explicit or (target and target.exists) then -- mention
+      local drift = target.exists and M.symbol_drift(session.bufnr, ref, target)
       if not target.exists then
         add("missing_mention", ref, ("Not found: %s"):format(target.abs))
+      elseif drift then
+        if drift.missing then
+          add("symbol", ref, ("`%s` is no longer in %s."):format(drift.name, name))
+        else
+          local where = drift.start_line == drift.end_line and ("L%d"):format(drift.start_line)
+            or ("L%d-L%d"):format(drift.start_line, drift.end_line)
+          add("symbol", ref, ("`%s` is now at %s."):format(drift.name, where))
+        end
       elseif ref.start_line and target.type == "file" then
         local total = line_count(target.abs)
         if total and (ref.start_line > total or ref.end_line > total) then

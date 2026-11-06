@@ -101,6 +101,7 @@ function M.apply(ctx, result, abs)
     vim.notify("vergil: " .. err, vim.log.levels.WARN)
     return M.cancel(ctx)
   end
+  mention = formatter.with_symbol(mention, result.symbol)
   local row = span.start_row + 1
 
   if result.action == "mention" then
@@ -111,6 +112,7 @@ function M.apply(ctx, result, abs)
   local block = assert(snippets.block(ctx.ref.path, result.start_line, result.end_line, result.lines, {
     mention_format = fmt,
     language = snippets.language(abs),
+    symbol = result.symbol,
   }))
 
   if result.action == "both" then

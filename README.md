@@ -111,7 +111,15 @@ select with `V`, then:
 | `Enter` | the mention `` `src/auth/session.ts#L12-L35` ``, replacing the reference |
 | `gs` | a verbatim snippet in place of the reference |
 | `gb` | the mention, plus the snippet below the line |
+| `gO` | nothing yet: lists the file's functions and classes, and selects the one you choose |
 | `q` / `Esc` | nothing: cancels and removes the `#` |
+
+When the lines are exactly one function, class or method, its name follows
+the range: `` `src/range.lua#L96-L135` (`M.apply`) ``. The agent gets exact
+lines and a name to fall back on, and vergil warns when the file changes and
+the range no longer matches, with a code action to update it. Symbols come
+from Neovim's treesitter parsers: Lua, C and Vimscript ship with Neovim,
+other languages need a parser installed (e.g. with nvim-treesitter).
 
 A snippet looks like this. Its header is a mention, never an `@`, so the code
 isn't loaded twice:
@@ -141,7 +149,8 @@ a snippet, `gb` both). The reference you opened becomes a ranged mention, and
 you're back in the prompt. `<C-^>` returns to the file for more.
 
 **Fix what vergil flags.** Diagnostics point out files attached twice,
-large attachments, line ranges past the end of a file, and missing files. `gra` offers fixes: convert an attachment to a mention,
+large attachments, line ranges past the end of a file or out of step with
+their function, and missing files. `gra` offers fixes: convert an attachment to a mention,
 replace a ranged mention with its snippet, or select lines.
 
 **Hand it back.** `:Vergil submit` (or `ZZ` with the preset) writes the prompt
@@ -282,10 +291,13 @@ require("vergil").setup({
   agent = "claude",
   root = nil, -- project root; defaults to the directory Neovim started in
   activation = { filename_patterns = nil }, -- nil: { "claude-prompt-*.md" }
-  mention = { format = "github" }, -- "colon", or { single = "{path}#L{start}", range = "{path}#L{start}-L{end}" }
+  mention = {
+    format = "github", -- "colon", or { single = "{path}#L{start}", range = "{path}#L{start}-L{end}" }
+    symbols = true, -- add the function or class name after a range that covers exactly one
+  },
   triggers = { attach = "@", mention = "@@", range = "#", skills = "/" },
   skills = { extra_items = {} }, -- e.g. { { name = "compact", description = "Summarize the conversation" } }
-  selector = { keys = { mention = "<CR>", snippet = "gs", both = "gb", cancel = { "q", "<Esc>" } } },
+  selector = { keys = { mention = "<CR>", snippet = "gs", both = "gb", symbols = "gO", cancel = { "q", "<Esc>" } } },
   completion = { native = false, reopen_on_backspace = true },
   files = { command = nil }, -- custom discovery command run in the root, e.g. { "fd", "-t", "f" }
   keymaps = { preset = false },
@@ -301,6 +313,7 @@ require("vergil").setup({
       missing_mention = "warn",
       missing_attachment = "info",
       fenced = "hint",
+      symbol = "warn", -- a named range no longer matches its function
     },
   },
 })

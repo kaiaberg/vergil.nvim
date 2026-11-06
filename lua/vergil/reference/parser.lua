@@ -140,12 +140,20 @@ function M.parse(lines, opts)
     local row = i - 1
     local spans = fenced[i] and {} or code_spans(line)
     if not fenced[i] then
+      local ranged ---@type vergil.Reference? the previous mention, if it has a range
       for _, span in ipairs(spans) do
-        if span.ticks == 1 then
+        -- `a.lua#L3-L9` (`M.apply`): the name after a ranged mention is
+        -- part of it, not a mention of a file called `M.apply`.
+        local is_symbol = ranged
+          and line:sub(ranged.span.end_col + 1, span.start - 1) == " ("
+          and line:sub(span.finish + 1, span.finish + 1) == ")"
+        ranged = nil
+        if span.ticks == 1 and not is_symbol then
           local ref = mention_from(span, row, span.content, opts.mention_format)
           if ref then
             ref.text = line:sub(span.start, span.finish)
             refs[#refs + 1] = ref
+            ranged = ref.start_line and ref or nil
           end
         end
       end

@@ -28,6 +28,10 @@ return {
     h.eq({ refs[2].start_line, refs[2].end_line, refs[2].text }, { 12, 35, "`src/auth/session.ts#L12-L35`" })
     h.eq(refs[2].span, { start_row = 4, start_col = 13, end_row = 4, end_col = 42 })
   end,
+  ["a name after a ranged mention belongs to it"] = function()
+    h.eq(summary(parse("see `a.lua#L3-L9` (`M.apply`) and `b.lua` (`c.lua`)")), { "mention:a.lua", "mention:b.lua", "mention:c.lua" })
+    h.eq(summary(parse("`a.lua#L3` (`x.lua`) `a.lua#L4` `y.lua`")), { "mention:a.lua", "mention:a.lua", "mention:y.lua" })
+  end,
   ["spans match the source text exactly"] = function()
     local lines = { 'a @x.ts, `y/z.md#L3` @"q r.md" `c.lua` end' }
     for _, r in ipairs(parser.parse(lines, h.opts())) do

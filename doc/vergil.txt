@@ -148,6 +148,8 @@ are involved. Use any motion, search, count or |V|, then:
            header; if it stood alone on its line, the snippet replaces the
            line.
   gb       Insert the mention, and the snippet below the line.
+  gO       List the file's functions, classes and methods; choosing one
+           selects its lines (see |vergil-symbols|).
   q <Esc>  Cancel: removes the `#`, nothing else. <Esc> in Visual mode only
            leaves Visual mode.
 
@@ -168,6 +170,20 @@ code, and take the language from the file name:
   ```
 <
 |:Vergil-snippet| does the same for a ranged reference already in the prompt.
+
+                                                             *vergil-symbols*
+When the selected lines are exactly one function, class or method, its name
+follows the range: `` `src/range.lua#L96-L135` (`M.apply`) ``, also in a
+snippet's header and with |:Vergil-send|. Whether the lines were picked with
+`gO` or by hand doesn't matter. The agent gets exact lines and a name to fall
+back on, and vergil warns when the range no longer matches the name, with a
+code action to update it. `mention.symbols = false` leaves names out.
+
+Symbols come from Neovim's treesitter parser for the file's language; no
+LSP is involved. Neovim ships parsers for Lua, C, Vimscript and a few more;
+install others (e.g. with nvim-treesitter) for more languages. Without a
+parser, `gO` says so and nothing else changes. Callbacks passed as arguments
+aren't listed; nested symbols are qualified, e.g. `Session.enable`.
 
 ==============================================================================
 6. SKILLS AND COMMANDS                                         *vergil-skills*
@@ -219,21 +235,23 @@ on disk.
 
   Check                                              Default severity
   Same file attached twice (paths normalized)        warn
-  Attachment above `attachment_token_warning`        warn
+  Attachment above `attachment_token_warning`        info
     (tokens estimated as bytes / 3)
   Mention range past the end of the file             warn
   `@file#range`: the range doesn't limit it          hint
   Mention target not found                           warn
   Attachment target not found                        info
-  `@file` in fenced code that will still attach      hint
+  `@file` in fenced code that may still attach       hint
+  `file#L3-L9` (`name`): the range no longer         warn
+    matches that symbol (|vergil-symbols|)
 
 Ordinary inline code that might be a path, prose and pasted logs aren't
 flagged beyond the low-severity "attachment not found". Validation never
 changes the buffer.
 
 Code actions (`gra`): convert between attachment and mention (preferred as a
-fix for duplicate, large and ranged attachments), replace with snippet, add
-snippet below, and select lines.
+fix for duplicate, large and ranged attachments), update a drifted range to
+its symbol, replace with snippet, add snippet below, and select lines.
 
 ==============================================================================
 9. SUBMIT AND ABORT                                            *vergil-submit*
@@ -337,12 +355,12 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
     agent = "claude",
     root = nil,
     activation = { filename_patterns = nil }, -- nil: { "claude-prompt-*.md" }
-    mention = { format = "github" },
+    mention = { format = "github", symbols = true },
     triggers = { attach = "@", mention = "@@", range = "#", skills = "/" },
     skills = { extra_items = {} },
     selector = {
       keys = { mention = "<CR>", snippet = "gs", both = "gb",
-               cancel = { "q", "<Esc>" } },
+               symbols = "gO", cancel = { "q", "<Esc>" } },
     },
     completion = { native = false, reopen_on_backspace = true },
     files = { command = nil },
@@ -354,7 +372,7 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
       severity = {
         duplicate = "warn", large = "info", range = "warn",
         ignored_range = "hint", missing_mention = "warn",
-        missing_attachment = "info", fenced = "hint",
+        missing_attachment = "info", fenced = "hint", symbol = "warn",
       },
     },
   })
@@ -367,6 +385,8 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
                         `  range = "{path}#L{start}-L{end}" }`. A template
                         starts with {path}, has a separator after it, and
                         puts {start} before {end}.
+`mention.symbols`       Add the function or class name after a range that
+                        covers exactly one. See |vergil-symbols|.
 `triggers`              Completion and selector triggers. `range` must be a
                         single character.
 `skills.extra_items`    Extra `/` items: `{ name, description?,

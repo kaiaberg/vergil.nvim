@@ -17,6 +17,13 @@ All notable changes are documented here. The format follows
   send them back to the prompt as a mention, snippet or both. The first send
   replaces the reference you opened. With the preset, `<CR>`, `gs` and `gb`
   in Visual mode, in files only, while a prompt is open.
+- Function and class references: `gO` in the line selector lists the file's
+  functions, classes and methods (from Neovim's treesitter parsers) and
+  selects one. A range covering exactly one symbol gets its name:
+  `` `a.lua#L96-L135` (`M.apply`) ``, also in snippet headers and with
+  `:Vergil send`. A new `symbol` diagnostic flags a range that no longer
+  matches its name, with a code action to update it. `mention.symbols`
+  turns names off.
 - README and `:help vergil-ahead-of-time`: drafting prompts without a running
   agent.
 

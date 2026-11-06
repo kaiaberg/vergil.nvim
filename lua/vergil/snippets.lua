@@ -30,7 +30,7 @@ end
 ---@param start_line integer
 ---@param end_line integer
 ---@param lines string[] the source lines, verbatim
----@param opts { mention_format: string|vergil.MentionTemplates, language: string }
+---@param opts { mention_format: string|vergil.MentionTemplates, language: string, symbol: string? }
 ---@return string[]? block
 ---@return string? err
 function M.block(path, start_line, end_line, lines, opts)
@@ -39,7 +39,7 @@ function M.block(path, start_line, end_line, lines, opts)
     return nil, err
   end
   local fence = M.fence(lines)
-  local block = { ("From %s:"):format(mention), "", fence .. opts.language }
+  local block = { ("From %s:"):format(formatter.with_symbol(mention, opts.symbol)), "", fence .. opts.language }
   vim.list_extend(block, lines)
   block[#block + 1] = fence
   return block
