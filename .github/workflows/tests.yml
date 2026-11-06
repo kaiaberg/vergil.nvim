@@ -12,19 +12,15 @@ concurrency:
 
 jobs:
   unit:
-    name: Neovim ${{ matrix.nvim }} (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Neovim ${{ matrix.nvim }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
         nvim: [v0.11.7, stable, nightly]
-        include:
-          - os: macos-latest
-            nvim: stable
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: rhysd/action-setup-vim@v1
         with:
