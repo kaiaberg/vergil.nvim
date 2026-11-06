@@ -5,8 +5,16 @@ local M = {}
 ---@param files string[]
 ---@param kind "attach"|"mention"
 ---@param api vergil.PickApi
-function M.pick_files(files, kind, api)
-  vim.ui.select(files, { prompt = kind == "mention" and "Mention file" or "Attach file" }, function(choice)
+---@param opts vergil.PickFilesOpts?
+function M.pick_files(files, kind, api, opts)
+  opts = opts or {}
+  local labels = opts.labels or {}
+  vim.ui.select(files, {
+    prompt = opts.title or (kind == "mention" and "Mention file" or "Attach file"),
+    format_item = function(path)
+      return labels[path] and ("%s  (%s)"):format(path, labels[path]) or path
+    end,
+  }, function(choice)
     if choice then
       api.choose(kind, choice)
     end

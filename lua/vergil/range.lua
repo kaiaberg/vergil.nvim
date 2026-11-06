@@ -71,7 +71,7 @@ end
 --- blank line on each side unless there already is one. At the end of the
 --- buffer a blank line is added after it, so there is somewhere to type.
 ---@return integer after 1-based row of the line right after the block
-local function insert_block(bufnr, row, block)
+function M.insert_block(bufnr, row, block)
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
   local out = {}
   if row > 0 and not is_blank(lines[row]) then
@@ -118,7 +118,7 @@ function M.apply(ctx, result, abs)
   if result.action == "both" then
     vim.api.nvim_buf_set_text(bufnr, span.start_row, span.start_col, span.end_row, span.end_col, { mention })
     undojoin()
-    insert_block(bufnr, row, block)
+    M.insert_block(bufnr, row, block)
     return resume(ctx, row, span.start_col + #mention)
   end
 
@@ -129,10 +129,10 @@ function M.apply(ctx, result, abs)
   undojoin()
   if is_blank(line) then
     vim.api.nvim_buf_set_lines(bufnr, span.start_row, row, false, {})
-    local after = insert_block(bufnr, row - 1, block)
+    local after = M.insert_block(bufnr, row - 1, block)
     return resume(ctx, after, 0)
   end
-  insert_block(bufnr, row, block)
+  M.insert_block(bufnr, row, block)
   return resume(ctx, row, span.start_col)
 end
 

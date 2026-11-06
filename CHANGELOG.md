@@ -24,6 +24,11 @@ All notable changes are documented here. The format follows
   `:Vergil send`. A new `symbol` diagnostic flags a range that no longer
   matches its name, with a code action to update it. `mention.symbols`
   turns names off.
+- `:Vergil pick changed`: files changed in git (modified, staged, renamed,
+  untracked) with their status, to attach. With telescope, `<Tab>` marks
+  several files to insert at once, in every file picker.
+- `:Vergil diff [staged|<rev>]`: inserts `git diff` as a fenced `diff` block,
+  limited to the root.
 - README and `:help vergil-ahead-of-time`: drafting prompts without a running
   agent.
 

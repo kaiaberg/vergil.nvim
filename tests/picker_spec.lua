@@ -67,7 +67,7 @@ return {
   end,
   ["errors"] = function()
     h.prompt(root, { "" }, "pick")
-    h.eq({ picker.pick("nope") }, { false, 'unknown picker "nope"; expected attach, mention or skills' })
+    h.eq({ picker.pick("nope") }, { false, 'unknown picker "nope"; expected attach, mention, skills or changed' })
     h.errors(function() require("vergil").setup({ picker = { backend = "fzf" } }) end, "picker.backend")
   end,
 }

@@ -292,10 +292,20 @@ prompt from before `Ctrl+G`, even if it was written in between.
 :Vergil toggle                                           *:Vergil-toggle*
     Convert the reference under the cursor between attachment and mention.
 
-:Vergil pick [attach|mention|skills]                       *:Vergil-pick*
+:Vergil pick [attach|mention|skills|changed]               *:Vergil-pick*
     Full-size picker. <CR> inserts, <C-t> switches between attachment and
-    mention, <C-r> selects lines. Uses telescope.nvim, else |vim.ui.select|
-    (<CR> only).
+    mention, <C-r> selects lines, <Tab> marks several files to insert at
+    once. Uses telescope.nvim, else |vim.ui.select| (<CR> only).
+    `changed` lists files changed in git (modified, staged, renamed,
+    untracked; not deleted) with their status, to attach.
+
+:Vergil diff [staged|{rev}]                                *:Vergil-diff*
+    Insert `git diff` below the cursor line as a fenced `diff` block,
+    headed by the command. Without an argument, all uncommitted changes to
+    tracked files (`git diff HEAD`); `staged` only staged ones; {rev} a
+    revision or range such as `HEAD~1` or `main...`. Only changes under the
+    root are shown, with paths relative to it. Warns when the diff is above
+    `diagnostics.attachment_token_warning`.
 
 :Vergil submit                                           *:Vergil-submit*
     Write the prompt, settle other modified buffers, exit.

@@ -1,15 +1,25 @@
 --- telescope.nvim picker backend, with file previews.
 ---
---- Keys: `Enter` inserts the current type, `<C-t>` switches between
---- attachment and mention, `<C-r>` opens line selection for the file.
+--- Keys: `Enter` inserts the current type (every file marked with `<Tab>`,
+--- if any), `<C-t>` switches between attachment and mention, `<C-r>` opens
+--- line selection for the file.
 local M = {}
 
-local TITLES = { attach = "Attach file  (<C-t> mention · <C-r> lines)", mention = "Mention file  (<C-t> attach · <C-r> lines)" }
+local TITLES = {
+  attach = "Attach file  (<C-t> mention · <C-r> lines · <Tab> mark)",
+  mention = "Mention file  (<C-t> attach · <C-r> lines · <Tab> mark)",
+}
 
 ---@param files string[]
 ---@param kind "attach"|"mention"
 ---@param api vergil.PickApi
-function M.pick_files(files, kind, api)
+---@param opts vergil.PickFilesOpts?
+function M.pick_files(files, kind, api, opts)
+  opts = opts or {}
+  local labels = opts.labels or {}
+  local function title(k)
+    return opts.title and ("%s: %s"):format(opts.title, TITLES[k]) or TITLES[k]
+  end
   local actions = require("telescope.actions")
   local action_state = require("telescope.actions.state")
   local conf = require("telescope.config").values
@@ -19,11 +29,13 @@ function M.pick_files(files, kind, api)
 
   pickers
     .new({}, {
-      prompt_title = TITLES[kind],
+      prompt_title = title(kind),
       finder = finders.new_table({
         results = files,
         entry_maker = function(path)
-          return { value = path, display = path, ordinal = path, path = api.ctx.root .. "/" .. path }
+          local display = labels[path] and ("%s  (%s)"):format(path, labels[path]) or path
+          local abs = path:sub(1, 1) == "/" and path or (api.ctx.root .. "/" .. path)
+          return { value = path, display = display, ordinal = path, path = abs }
         end,
       }),
       sorter = conf.file_sorter({}),
@@ -35,18 +47,23 @@ function M.pick_files(files, kind, api)
         end
         actions.select_default:replace(function()
           local path = selected()
+          local marked = vim.tbl_map(function(entry)
+            return entry.value
+          end, action_state.get_current_picker(prompt_bufnr):get_multi_selection())
           actions.close(prompt_bufnr)
-          if path then
-            vim.schedule(function()
+          vim.schedule(function()
+            if #marked > 0 then
+              api.choose_many(state.kind, marked)
+            elseif path then
               api.choose(state.kind, path)
-            end)
-          end
+            end
+          end)
         end)
         map({ "i", "n" }, "<C-t>", function()
           state.kind = state.kind == "attach" and "mention" or "attach"
           local picker = action_state.get_current_picker(prompt_bufnr)
           pcall(function()
-            picker.prompt_border:change_title(TITLES[state.kind])
+            picker.prompt_border:change_title(title(state.kind))
           end)
         end)
         map({ "i", "n" }, "<C-r>", function()

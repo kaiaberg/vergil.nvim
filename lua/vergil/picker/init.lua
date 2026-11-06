@@ -1,7 +1,9 @@
---- Full-size picker (`:Vergil pick [attach|mention|skills]`).
+--- Full-size picker (`:Vergil pick [attach|mention|skills|changed]`).
 ---
 --- `Enter` inserts the type you started with, `<C-t>` switches between
---- attachment and mention, `<C-r>` opens line selection for the file.
+--- attachment and mention, `<C-r>` opens line selection for the file, and
+--- telescope's `<Tab>` marks several files to insert at once. `changed`
+--- lists files changed in git, to attach.
 --- Backends: telescope.nvim when available (or `picker.backend`), else
 --- `vim.ui.select`, which supports `Enter` only.
 local config = require("vergil.config")
@@ -9,7 +11,7 @@ local formatter = require("vergil.reference.formatter")
 
 local M = {}
 
-M.kinds = { "attach", "mention", "skills" }
+M.kinds = { "attach", "mention", "skills", "changed" }
 
 ---@class vergil.PickContext
 ---@field bufnr integer
@@ -22,6 +24,7 @@ M.kinds = { "attach", "mention", "skills" }
 ---@class vergil.PickApi
 ---@field ctx vergil.PickContext
 ---@field choose fun(kind: string, value: string|vergil.Skill)
+---@field choose_many fun(kind: string, values: string[]) several files, inserted space-separated
 ---@field select_lines fun(path: string)
 
 local function backend()
@@ -42,7 +45,7 @@ end
 
 --- Inserts text at the context's position. Adds a space before it when
 --- needed, because Claude Code only treats `@` and `/` after whitespace as
---- references.
+--- references, and after it, so it doesn't run into the following text.
 ---@param ctx vergil.PickContext
 ---@param text string
 function M.insert(ctx, text)
@@ -51,11 +54,12 @@ function M.insert(ctx, text)
   end
   local line = vim.api.nvim_buf_get_lines(ctx.bufnr, ctx.row, ctx.row + 1, false)[1] or ""
   local col = math.min(ctx.col, #line)
-  local before = line:sub(col, col)
+  local before, after = line:sub(col, col), line:sub(col + 1, col + 1)
   if col > 0 and not before:match("%s") then
     text = " " .. text
   end
-  vim.api.nvim_buf_set_text(ctx.bufnr, ctx.row, col, ctx.row, col, { text })
+  local pad = (after ~= "" and not after:match("%s") and not text:match("%s$")) and " " or ""
+  vim.api.nvim_buf_set_text(ctx.bufnr, ctx.row, col, ctx.row, col, { text .. pad })
   if vim.api.nvim_win_is_valid(ctx.win) then
     vim.api.nvim_set_current_win(ctx.win)
     local end_col = col + #text
@@ -79,18 +83,39 @@ function M.text_for(kind, value)
   return formatter.attachment(value, config.adapter())
 end
 
----@param kind? "attach"|"mention"|"skills"
+---@class vergil.PickFilesOpts
+---@field title string?
+---@field labels table<string, string>? text shown after each path, e.g. a git status
+
+---@param kind? "attach"|"mention"|"skills"|"changed"
 ---@return boolean ok
 ---@return string? err
 function M.pick(kind)
   kind = kind or "attach"
   if not vim.tbl_contains(M.kinds, kind) then
-    return false, ("unknown picker %q; expected attach, mention or skills"):format(kind)
+    return false, ("unknown picker %q; expected attach, mention, skills or changed"):format(kind)
   end
   local bufnr = vim.api.nvim_get_current_buf()
   local session = require("vergil.session").get(bufnr)
   if not session then
     return false, "not enabled in this buffer (use :Vergil enable)"
+  end
+  local changed
+  if kind == "changed" then
+    local err
+    changed, err = require("vergil.git").changed(session.root)
+    if not changed then
+      return false, err
+    end
+    -- Not the prompt itself, when it's drafted inside the repository.
+    local self = vim.uv.fs_realpath(vim.api.nvim_buf_get_name(bufnr))
+    changed = vim.tbl_filter(function(f)
+      local abs = f.path:sub(1, 1) == "/" and f.path or (session.root .. "/" .. f.path)
+      return not self or vim.uv.fs_realpath(abs) ~= self
+    end, changed)
+    if #changed == 0 then
+      return false, "no changed files"
+    end
   end
   local win = vim.api.nvim_get_current_win()
   local row, col = unpack(vim.api.nvim_win_get_cursor(win))
@@ -113,6 +138,15 @@ function M.pick(kind)
         M.insert(ctx, text)
       end
     end,
+    choose_many = function(k, values)
+      local parts = {}
+      for _, value in ipairs(values) do
+        parts[#parts + 1] = M.text_for(k, value)
+      end
+      if #parts > 0 then
+        M.insert(ctx, table.concat(parts, " "))
+      end
+    end,
     select_lines = function(path)
       local ok, err = require("vergil.range").select_for_path({
         bufnr = ctx.bufnr,
@@ -131,6 +165,13 @@ function M.pick(kind)
   local b = backend()
   if kind == "skills" then
     b.pick_skills(require("vergil.skills").items(session.root), api)
+  elseif kind == "changed" then
+    local paths, labels = {}, {}
+    for _, f in ipairs(changed) do
+      paths[#paths + 1] = f.path
+      labels[f.path] = f.status
+    end
+    b.pick_files(paths, "attach", api, { title = "Changed files", labels = labels })
   else
     require("vergil.files").list(session.root, function(files)
       b.pick_files(files, kind, api)

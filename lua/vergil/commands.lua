@@ -61,6 +61,12 @@ M.subcommands = {
       notify(err, vim.log.levels.WARN)
     end
   end,
+  diff = function(args)
+    local ok, err = require("vergil.diff").insert(args[1])
+    if not ok then
+      notify(err, vim.log.levels.WARN)
+    end
+  end,
   toggle = function()
     local ok, err = require("vergil").toggle()
     if not ok then
@@ -102,7 +108,12 @@ function M.complete(arglead, cmdline)
   if cmdline:match("^%s*%S+%s+pick%s+%S*$") then
     return vim.tbl_filter(function(n)
       return vim.startswith(n, arglead)
-    end, { "attach", "mention", "skills" })
+    end, { "attach", "mention", "skills", "changed" })
+  end
+  if cmdline:match("^%s*%S+%s+diff%s+%S*$") then
+    return vim.tbl_filter(function(n)
+      return vim.startswith(n, arglead)
+    end, { "staged", "HEAD~1" })
   end
   if cmdline:match("^%s*%S+%s+send%s+%S*$") then
     return vim.tbl_filter(function(n)

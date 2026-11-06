@@ -148,6 +148,11 @@ and run `:'<,'>Vergil send` (`<CR>` in Visual mode with the preset; `gs` sends
 a snippet, `gb` both). The reference you opened becomes a ranged mention, and
 you're back in the prompt. `<C-^>` returns to the file for more.
 
+**Review what you changed.** `:Vergil pick changed` lists files changed in
+git with their status; mark several with `<Tab>` to attach them at once.
+`:Vergil diff` inserts the uncommitted changes as a `diff` block (`staged`, or
+a revision like `HEAD~1`, for others).
+
 **Fix what vergil flags.** Diagnostics point out files attached twice,
 large attachments, line ranges past the end of a file or out of step with
 their function, and missing files. `gra` offers fixes: convert an attachment to a mention,
@@ -248,7 +253,8 @@ will open.
 | `:Vergil snippet [both]` | Replace a ranged reference with its lines (`both`: keep it, add the lines below) |
 | `:Vergil send [snippet\|both]` | Send the cursor line, or a range (`:'<,'>`), of the current file to the prompt as a mention, snippet or both |
 | `:Vergil toggle` | Convert between attachment and mention |
-| `:Vergil pick [attach\|mention\|skills]` | Full-size picker: `Enter` inserts, `<C-t>` switches type, `<C-r>` selects lines |
+| `:Vergil pick [attach\|mention\|skills\|changed]` | Full-size picker: `Enter` inserts, `<C-t>` switches type, `<C-r>` selects lines, `<Tab>` marks several; `changed` lists files changed in git |
+| `:Vergil diff [staged\|<rev>]` | Insert `git diff` (default: all uncommitted changes) as a fenced `diff` block |
 | `:Vergil submit` | Write the prompt, settle other modified buffers, exit |
 | `:Vergil abort` | Restore the previous prompt and exit |
 | `:Vergil enable` / `disable` | Turn vergil on or off in the current buffer |
