@@ -132,13 +132,49 @@ local function check_prompt_safety()
   end
 end
 
-local function check_agent()
-  health.start("Claude Code")
-  if vim.fn.executable("claude") == 1 then
-    health.ok("`claude` is on PATH")
-  else
-    health.info("`claude` is not on PATH (only needed to run Claude Code, not for vergil itself)")
+--- The version an agent's `--version` prints, if it runs within a second.
+---@param exe string
+---@return string?
+function M.agent_version(exe)
+  local ok, res = pcall(function()
+    return vim.system({ exe, "--version" }, { text = true }):wait(1000)
+  end)
+  if not ok or res.code ~= 0 then
+    return nil
   end
+  return (res.stdout or ""):match("%d+%.%d+%.%d+")
+end
+
+--- Agents change faster than vergil; say which version its assumptions
+--- (syntax, size limits, exit codes) were last checked against.
+local function check_agent_version(adapter)
+  local exe = adapter.executable
+  local name = adapter.display_name or adapter.name
+  local installed = M.agent_version(exe)
+  health.ok(("`%s` is on PATH%s"):format(exe, installed and (" (" .. installed .. ")") or ""))
+  local verified = adapter.verified_version
+  if not (verified and installed) then
+    return
+  end
+  if installed == verified then
+    health.ok(("vergil's assumptions about %s were checked with this version"):format(name))
+  else
+    health.info(
+      ("vergil's assumptions about %s were last checked with %s; you have %s. "):format(name, verified, installed)
+        .. "Usually nothing changes; if references or diagnostics look off, see \"Observed behaviour\" in the README."
+    )
+  end
+end
+
+--- Only when the agent is installed: vergil works without it, for example
+--- to write prompts or plans ahead of time.
+local function check_agent()
+  local adapter = require("vergil.config").adapter()
+  if not (adapter.executable and vim.fn.executable(adapter.executable) == 1) then
+    return
+  end
+  health.start("Agent: " .. (adapter.display_name or adapter.name))
+  check_agent_version(adapter)
   local visual, editor = vim.env.VISUAL, vim.env.EDITOR
   local used = (visual and visual ~= "") and ("$VISUAL=" .. visual) or (editor and editor ~= "") and ("$EDITOR=" .. editor)
   if used then

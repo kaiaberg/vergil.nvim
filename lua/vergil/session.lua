@@ -13,6 +13,9 @@ local M = {}
 ---@field agent string
 
 local sessions = {} ---@type table<integer, vergil.Session>
+--- The prompt file's bytes when vergil first saw it, for `:Vergil abort`.
+--- Kept across disable/enable, so only the very first read counts.
+local originals = {} ---@type table<integer, string[]|false>
 local startup_root ---@type string?
 
 --- Records Neovim's working directory as the root. Only the first call counts.
@@ -66,6 +69,10 @@ function M.enable(bufnr)
   end
   local session = { bufnr = bufnr, root = M.root(), agent = config.options.agent }
   sessions[bufnr] = session
+  if originals[bufnr] == nil then
+    local name = vim.api.nvim_buf_get_name(bufnr)
+    originals[bufnr] = vim.fn.filereadable(name) == 1 and vim.fn.readfile(name, "b") or false
+  end
   vim.b[bufnr].vergil_enabled = true
   require("vergil.lsp.client").attach(bufnr)
   require("vergil.range").attach(bufnr)
@@ -139,6 +146,15 @@ end
 ---@param bufnr integer
 function M.forget(bufnr)
   sessions[bufnr] = nil
+  originals[bufnr] = nil
+end
+
+--- The prompt file as it was when vergil first enabled the buffer, or nil
+--- when the file didn't exist yet.
+---@param bufnr integer
+---@return string[]?
+function M.original(bufnr)
+  return originals[bufnr] or nil
 end
 
 return M

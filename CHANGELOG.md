@@ -6,6 +6,28 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `:checkhealth vergil` shows the agent's version and which version vergil's
+  assumptions were last checked against.
+- `make verify` runs the Claude Code checks and records the version they
+  passed with.
+- Tests run on GitHub for Neovim 0.11.7, stable and nightly.
+- README and `:help vergil-ahead-of-time`: drafting prompts without a running
+  agent.
+
+### Changed
+
+- `:Vergil abort` also writes the prompt file back as it was when Neovim
+  opened it, so it doesn't depend on the agent honouring the exit code.
+- Diagnostics no longer predict what Claude Code will do: the large,
+  ignored-range and fenced messages hint instead, and the large-attachment
+  check defaults to Info instead of Warning.
+- Claude Code is optional: `:checkhealth vergil` only reports on it when it's
+  installed.
+- Version-specific Claude Code behaviour is collected under "Observed
+  behaviour" in the README and `:help vergil-observed`.
+
 ## [0.1.0] - 2026-11-05
 
 First release: a Vim-native toolkit for writing Claude Code prompts in the

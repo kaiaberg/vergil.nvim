@@ -79,6 +79,25 @@ return {
     h.eq(exits, { "cquit" })
     h.eq(on_disk(vim.api.nvim_buf_get_name(b)), before)
   end,
+  ["abort writes back the prompt as it was when opened"] = function()
+    vim.cmd("silent! %bwipeout!")
+    local path = root .. "/claude-prompt-original.md"
+    vim.fn.writefile({ "ORIGINAL @src/a.lua", "" }, path, "b")
+    vim.cmd.edit(vim.fn.fnameescape(path))
+    local b = vim.api.nvim_get_current_buf()
+    h.truthy(require("vergil.session").is_enabled(b))
+    local exits = {}
+    submit.exit = function(cmd) exits[#exits + 1] = cmd end
+    vim.api.nvim_buf_set_lines(b, 0, -1, false, { "edited and written" })
+    vim.cmd("silent write")
+    require("vergil").disable(b) -- a re-enable must not take a new copy
+    require("vergil").enable(b)
+    h.eq(submit.abort(), true)
+    h.eq(exits, { "cquit" })
+    h.eq(vim.fn.readfile(path, "b"), { "ORIGINAL @src/a.lua", "" })
+    vim.cmd("silent! %bwipeout!")
+    vim.fn.delete(path)
+  end,
   ["abort still asks about other modified buffers"] = function()
     local b, exits, asked = setup()
     vim.cmd.split(vim.fn.fnameescape(root .. "/src/a.lua"))

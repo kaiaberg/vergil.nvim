@@ -4,8 +4,10 @@
 --- which leaves the agent waiting, and quitting with modified buffers fails.
 --- `:Vergil submit` writes the prompt, asks what to do about other modified
 --- buffers (never discarding them silently) and exits. `:Vergil abort` does
---- the same check and exits with `:cquit`, so Claude Code restores the
---- prompt from before `Ctrl+G` (M0: any non-zero exit discards the edit).
+--- the same check, writes the prompt file back as it was when vergil first
+--- read it, and exits with `:cquit`. Either is enough on its own: Claude Code
+--- discards the edit on a non-zero exit, and an agent that ignores the exit
+--- code still reads the original text back.
 local M = {}
 
 --- Overridable for tests.
@@ -137,6 +139,14 @@ function M.abort()
   local decision, serr = settle_others(bufnr, "aborting")
   if not decision then
     return false, serr
+  end
+  local original = require("vergil.session").original(bufnr)
+  local name = vim.api.nvim_buf_get_name(bufnr)
+  if original and vim.fn.filereadable(name) == 1 and not vim.deep_equal(vim.fn.readfile(name, "b"), original) then
+    -- writefile() skips BufWrite autocommands, so formatters can't touch it.
+    if vim.fn.writefile(original, name, "b") ~= 0 then
+      vim.notify("vergil: couldn't restore " .. name .. "; relying on the exit code", vim.log.levels.WARN)
+    end
   end
   M.exit("cquit")
   return true

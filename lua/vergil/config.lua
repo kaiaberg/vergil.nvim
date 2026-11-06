@@ -54,18 +54,18 @@ M.defaults = {
   -- vim.ui.select (Enter only).
   picker = { backend = "auto" },
   diagnostics = {
-    -- Warn above this many estimated tokens (bytes / 3). Claude Code drops
-    -- larger attachments silently; its limit is near 25k tokens.
+    -- Flag attachments above this many estimated tokens (bytes / 3). Agents
+    -- may skip or cut large files; see "Observed behaviour" in the README.
     attachment_token_warning = 20000,
     -- "error", "warn", "info", "hint", or false to turn a check off.
     severity = {
       duplicate = "warn", -- same file attached twice
-      large = "warn", -- attachment above the token threshold
+      large = "info", -- attachment above the token threshold
       range = "warn", -- mention range past the end of the file
-      ignored_range = "hint", -- @file#range: the range doesn't limit it
+      ignored_range = "hint", -- @file#range: the range may be ignored
       missing_mention = "warn",
       missing_attachment = "info", -- pasted text may contain @words
-      fenced = "hint", -- @file inside fenced code still gets attached
+      fenced = "hint", -- @file inside fenced code may still be attached
     },
   },
 }

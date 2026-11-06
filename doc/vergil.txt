@@ -30,8 +30,8 @@ CONTENTS                                                     *vergil-contents*
 vergil helps you write prompts for Claude Code in the Neovim instance that
 Claude Code's `Ctrl+G` opens. It completes file references and skills,
 selects exact lines with real Vim motions, inserts verbatim snippets,
-previews and opens references, and flags references Claude Code would
-mishandle.
+previews and opens references, and flags references that are likely
+mistakes.
 
 vergil only helps write the prompt. It never sends anything, never runs
 skills, and never changes text you didn't ask it to change. It runs as an
@@ -41,8 +41,8 @@ actions use Neovim's usual LSP mappings.
 ==============================================================================
 2. SETUP                                                        *vergil-setup*
 
-Requirements: Neovim 0.11 or newer and Claude Code. Optional: a completion
-engine (blink.cmp, nvim-cmp, or built-in completion), telescope.nvim for
+Requirements: Neovim 0.11 or newer. Optional: Claude Code, to hand prompts
+over with `Ctrl+G`; a completion engine (blink.cmp, nvim-cmp, or built-in completion), telescope.nvim for
 |:Vergil-pick|, ripgrep, fd or git for file discovery, and a Nerd Font for
 completion icons.
 
@@ -56,32 +56,52 @@ directory) and nowhere else. Use |:Vergil-enable| for other buffers.
 The project root is the directory Neovim started in, which is where Claude
 Code runs. It is captured once and survives |:cd|. Set `root` to override it.
 
+                                                       *vergil-ahead-of-time*
+vergil doesn't need a running agent. To draft prompts or a plan in advance,
+run |:Vergil-enable| in any Markdown buffer, or add file names to
+`activation.filename_patterns`, e.g. `{ "claude-prompt-*.md", "*.prompt.md" }`.
+Start Neovim in the project the prompt is for, since paths are relative to
+the root.
+
 Run |:checkhealth| `vergil` to check the setup.
 
 ==============================================================================
 3. REFERENCES: ATTACH AND MENTION                          *vergil-references*
 
                                                            *vergil-attachment*
-`@path` attaches a file: Claude Code loads the whole file into the
+`@path` attaches a file: the agent loads the whole file into the
 conversation. Paths with spaces are quoted: `@"docs/my notes.md"`. A range
-written on an attachment (`@file#L3`) doesn't limit it, and files above about
-25k tokens are dropped silently.
+written on an attachment (`@file#L3`) usually doesn't limit it, and large
+files may be skipped or cut (|vergil-observed|).
 
                                                               *vergil-mention*
-`` `path` `` mentions a file: Claude knows where to look and reads it only
-if needed. Mentions can point at lines: `` `path#L12` ``, `` `path#L12-L35` ``
+`` `path` `` mentions a file: the agent knows where to look and reads it
+only if needed. Mentions can point at lines: `` `path#L12` ``, `` `path#L12-L35` ``
 (the "github" format) or `` `path:12-35` `` (the "colon" format).
 
-Attach the files Claude must read in full, once; mention everything else.
+Attach the files the agent must read in full, once; mention everything
+else.
 Mentions of an attached file are never flagged.
 
-Rules vergil follows, verified against Claude Code 2.1.318:
+                                                             *vergil-observed*
+Observed behaviour, last checked with Claude Code 2.1.319. None of it is
+documented and any release may change it; |:checkhealth| `vergil` shows
+whether your version differs. vergil inserts plain `@path` references and
+Markdown mentions either way, and diagnostics only hint at what the agent
+might do.
 - `@` starts a reference only at line start or after whitespace, so `(@a)`,
   `"@a"`, `` `@a` `` and `me@example.com` are not references.
 - Trailing punctuation after an unquoted path is not part of it:
   `@a.ts),` attaches `a.ts`.
-- Claude Code ignores Markdown: `@Override` inside fenced code is attached
-  when a file of that name exists.
+- `@file#L5` attaches the whole file; the range is ignored.
+- Markdown is ignored: `@Override` inside fenced code is attached when a file
+  of that name exists.
+- Attachments above about 25k tokens are dropped without notice; from 256 KB
+  the agent is told the file was too large.
+- Exiting the editor with an error discards the edit.
+- Unchanged pasted text collapses again after `Ctrl+G`, except a paste at the
+  very end of the prompt.
+- If the editor fails to start, the prompt stays as it was, with no error.
 
                                                          *vergil-:Vergil-toggle*
 |:Vergil-toggle| and the "Convert" code action switch between the two:
@@ -209,8 +229,9 @@ Code waiting, and quitting with modified buffers fails.
 |:Vergil-submit| closes floats, writes the prompt, asks what to do with other
 modified buffers (save all, discard or cancel; never silently), then exits.
 
-|:Vergil-abort| asks the same question, then exits with |:cquit|. Claude Code
-then restores the prompt from before `Ctrl+G`, even if it was written.
+|:Vergil-abort| asks the same question, writes the prompt file back as it
+was when Neovim opened it, then exits with |:cquit|. Either restores the
+prompt from before `Ctrl+G`, even if it was written in between.
 
 ==============================================================================
 10. COMMANDS                                                 *vergil-commands*
@@ -242,8 +263,8 @@ then restores the prompt from before `Ctrl+G`, even if it was written.
     Write the prompt, settle other modified buffers, exit.
 
 :Vergil abort                                             *:Vergil-abort*
-    Settle other modified buffers, then exit so Claude Code restores the
-    previous prompt.
+    Settle other modified buffers, write the prompt back as it was, and
+    exit with an error, which restores the previous prompt.
 
 :Vergil enable                                           *:Vergil-enable*
 :Vergil disable                                         *:Vergil-disable*
@@ -302,7 +323,7 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
     diagnostics = {
       attachment_token_warning = 20000,
       severity = {
-        duplicate = "warn", large = "warn", range = "warn",
+        duplicate = "warn", large = "info", range = "warn",
         ignored_range = "hint", missing_mention = "warn",
         missing_attachment = "info", fenced = "hint",
       },
@@ -357,20 +378,17 @@ Lua API: `require("vergil")`
 ==============================================================================
 14. LIMITATIONS                                           *vergil-limitations*
 
-- Claude Code's syntax and limits are undocumented. vergil follows behaviour
-  verified against Claude Code 2.1.318; `make contract` checks it again.
+- Agent behaviour is undocumented and changes; see |vergil-observed|.
 - Only the short-lived `Ctrl+G` Neovim is supported.
 - vergil sees only the current prompt, not files attached earlier.
 - `@words` in pasted text may be reported as missing files (Info).
-- The large-attachment warning is an estimate.
+- The large-attachment note is an estimate.
 - Mentions with ranges are a convention Claude followed in testing; nothing
   enforces them.
 - Plugin skill discovery and synced-skill naming are best effort.
 - Skills with `user-invocable: false` are listed, as in Claude Code's menu.
 - Format-on-save or whitespace trimming stops Claude Code from collapsing
   unchanged pasted text again.
-- A paste at the very end of the prompt stays expanded after `Ctrl+G`, even
-  with plain Neovim; text after the paste avoids it.
 
 ==============================================================================
 15. TROUBLESHOOTING                                   *vergil-troubleshooting*

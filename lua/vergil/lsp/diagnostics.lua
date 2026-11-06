@@ -4,11 +4,13 @@
 --- Rules:
 --- - Paths are compared after normalization (`./a`, `a`, `~`, absolute).
 --- - Mentions of attached files are never flagged: attach once, then mention.
+--- - Messages state what vergil knows (sizes, ranges, code blocks) and hedge
+---   what the agent might do with it: agents change faster than vergil.
 --- - Fenced code is skipped, except for a hint when a fenced `@token` names a
----   real file, because Claude Code attaches it anyway.
+---   real file, because the agent may attach it anyway (Claude Code does).
 --- - Ordinary inline code that merely might be a path is never flagged.
---- - Attachment size is estimated in tokens (bytes / 3): Claude Code's limit
----   is token-based and files above it are silently dropped (M0 findings).
+--- - Attachment size is estimated in tokens (bytes / 3); agents tend to limit
+---   tokens, not bytes.
 local config = require("vergil.config")
 local parser = require("vergil.reference.parser")
 local resolver = require("vergil.reference.resolver")
@@ -71,7 +73,7 @@ function M.compute(session)
 
     if ref.mode == "attach" and ref.in_fence then
       if target and target.exists then
-        add("fenced", ref, ("Claude Code will attach %s, even inside a code block."):format(name))
+        add("fenced", ref, ("Inside a code block, but may still attach %s."):format(name))
       end
     elseif ref.mode == "attach" then
       local key = resolver.key(ref.path, session.root)
@@ -81,7 +83,7 @@ function M.compute(session)
         first_attach[key] = ref.span.start_row + 1
       end
       if ref.ignored_range then
-        add("ignored_range", ref, "The range doesn't limit an attachment: Claude Code attaches the whole file.")
+        add("ignored_range", ref, "Attachments are usually whole files, so the range may be ignored.")
       end
       if not target.exists then
         add("missing_attachment", ref, ("Not found: %s"):format(target.abs))
@@ -91,7 +93,7 @@ function M.compute(session)
           add(
             "large",
             ref,
-            ("Large attachment (~%dk tokens, %s): Claude Code may silently drop it. Mention it instead?"):format(
+            ("Large attachment (~%dk tokens, %s): the agent may skip or cut it. Mention it instead?"):format(
               math.floor(tokens / 1000),
               human_size(target.size)
             )

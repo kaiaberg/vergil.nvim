@@ -1,5 +1,7 @@
 # vergil.nvim
 
+[![Tests](https://github.com/kaiaberg/vergil.nvim/actions/workflows/tests.yml/badge.svg)](https://github.com/kaiaberg/vergil.nvim/actions/workflows/tests.yml)
+
 > Let us not speak of them, but look, and pass.
 >
 > — Virgil, *Inferno* III (trans. Longfellow)
@@ -20,10 +22,12 @@ holds the conversation.
 - [Installation](#installation)
 - [Quick tour](#quick-tour)
 - [Attach or mention?](#attach-or-mention)
+- [Writing prompts ahead of time](#writing-prompts-ahead-of-time)
 - [Completion setup](#completion-setup)
 - [Commands](#commands)
 - [Mappings](#mappings)
 - [Configuration](#configuration)
+- [Observed behaviour](#observed-behaviour)
 - [Limitations](#limitations)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -31,7 +35,9 @@ holds the conversation.
 ## Requirements
 
 - Neovim 0.11 or newer
-- Claude Code, with Neovim as its editor (see [Installation](#installation))
+- Optional: Claude Code, with Neovim as its editor, to hand prompts over with
+  `Ctrl+G` (see [Installation](#installation)). Without it, vergil still helps
+  you [write prompts ahead of time](#writing-prompts-ahead-of-time).
 - Optional: a completion engine. [blink.cmp](https://github.com/Saghen/blink.cmp)
   and [nvim-cmp](https://github.com/hrsh7th/nvim-cmp) both work, and so does
   Neovim's built-in LSP completion (`completion.native = true`).
@@ -130,14 +136,14 @@ opens the target at its line, and `:Vergil open split|vsplit|tab` opens it
 elsewhere. `:q` in a file opened this way brings you back to the prompt.
 
 **Fix what vergil flags.** Diagnostics point out files attached twice,
-attachments too large for Claude Code, line ranges past the end of a file,
-and missing files. `gra` offers fixes: convert an attachment to a mention,
+large attachments, line ranges past the end of a file, and missing files. `gra` offers fixes: convert an attachment to a mention,
 replace a ranged mention with its snippet, or select lines.
 
 **Hand it back.** `:Vergil submit` (or `ZZ` with the preset) writes the prompt
 and exits. It asks what to do with other files you changed, and never
-discards them silently. `:Vergil abort` (or `ZQ`) exits so Claude Code restores
-the prompt from before `Ctrl+G`.
+discards them silently. `:Vergil abort` (or `ZQ`) restores the prompt from
+before `Ctrl+G`: it writes the original text back and exits with an error, so
+either one is enough.
 
 ## Attach or mention?
 
@@ -145,17 +151,33 @@ Virgil's advice to Dante works here too: often it's enough to *look, and pass*.
 
 | | Attachment `@file` | Mention `` `file` `` |
 |---|---|---|
-| Effect | Claude Code loads the whole file into the conversation | Claude knows where to look, and reads it only if needed |
-| Context cost | Immediate | Only if Claude reads it |
-| Line ranges | Ignored: the whole file is always attached | `` `file#L12-L35` `` points at exact lines |
-| Large files | Silently dropped above about 25k tokens | No limit |
+| Effect | The agent loads the whole file into the conversation | The agent knows where to look, and reads it only if needed |
+| Context cost | Immediate | Only if the agent reads it |
+| Line ranges | Usually ignored: attachments are whole files | `` `file#L12-L35` `` points at exact lines |
+| Large files | May be skipped or cut ([details](#observed-behaviour)) | No limit |
 
-Attach the files Claude must read in full, once. Mention everything else,
+Attach the files the agent must read in full, once. Mention everything else,
 especially with line ranges. vergil never flags mentions of a file you already
 attached, because attaching once and then mentioning is the pattern to use.
 
-These behaviours of Claude Code aren't documented. vergil's contract tests
-check them against each new release (`make contract`).
+How an agent treats attachments isn't documented and changes between releases.
+[Observed behaviour](#observed-behaviour) lists what vergil last saw.
+
+## Writing prompts ahead of time
+
+vergil doesn't need a running agent. To draft prompts or an execution plan
+in advance, open any Markdown file and run `:Vergil enable`: completion,
+line selection, snippets, previews and diagnostics all work. To switch on
+automatically, add your own file names:
+
+```lua
+require("vergil").setup({
+  activation = { filename_patterns = { "claude-prompt-*.md", "*.prompt.md" } },
+})
+```
+
+Paths are relative to the project root, which is the directory Neovim started
+in. Start Neovim in the project the prompt is for, or set `root`.
 
 ## Completion setup
 
@@ -213,7 +235,7 @@ will open.
 | `:Vergil toggle` | Convert between attachment and mention |
 | `:Vergil pick [attach\|mention\|skills]` | Full-size picker: `Enter` inserts, `<C-t>` switches type, `<C-r>` selects lines |
 | `:Vergil submit` | Write the prompt, settle other modified buffers, exit |
-| `:Vergil abort` | Exit so Claude Code restores the previous prompt |
+| `:Vergil abort` | Restore the previous prompt and exit |
 | `:Vergil enable` / `disable` | Turn vergil on or off in the current buffer |
 
 Neovim's LSP defaults cover the rest: `K` (hover), `gd`/`<C-]>` (definition),
@@ -261,7 +283,7 @@ require("vergil").setup({
     attachment_token_warning = 20000, -- estimated as bytes / 3
     severity = { -- "error", "warn", "info", "hint", or false
       duplicate = "warn",
-      large = "warn",
+      large = "info",
       range = "warn",
       ignored_range = "hint",
       missing_mention = "warn",
@@ -278,20 +300,43 @@ must start with `{path}`, put a separator after it, and put `{start}` before
 
 See `:help vergil` for details.
 
+## Observed behaviour
+
+Last checked with Claude Code 2.1.319. None of this is documented, and any
+release may change it. `:checkhealth vergil` shows whether your version
+differs. vergil's own output doesn't depend on it: it inserts plain `@path`
+references and Markdown mentions, and the diagnostics only hint at what the
+agent might do.
+
+- `@` starts an attachment only at line start or after whitespace, so `(@a)`,
+  `` `@a` `` and `me@example.com` attach nothing.
+- Trailing punctuation (``.,;:!?)]}>'"` ``) after an unquoted path isn't part
+  of it; quote paths with spaces: `@"my notes.md"`.
+- `@file#L5` attaches the whole file; the range is ignored.
+- `@word` inside a fenced code block is still attached when a file of that
+  name exists.
+- Mentions (`` `file#L12-L35` ``) aren't parsed, so nothing is loaded.
+- Attachments above about 25k tokens are dropped without notice; from 256 KB
+  the agent is told the file was too large.
+- Exiting the editor with an error discards the edit and restores the prompt.
+- Unchanged pasted text collapses again after `Ctrl+G`, except a paste at the
+  very end of the prompt.
+- If the editor fails to start, the prompt stays as it was, with no error.
+
+Contributors: `make verify` re-runs these checks against the installed
+Claude Code and records its version.
+
 ## Limitations
 
-- **Claude Code's syntax is undocumented.** vergil follows behaviour verified
-  against Claude Code 2.1.318: which `@` counts, quoting, trailing
-  punctuation, size limits and the `/` menu. A future release may change it;
-  `make contract` checks again.
+- **Agent behaviour changes.** See [Observed behaviour](#observed-behaviour).
 - **Only the `Ctrl+G` editor session.** vergil targets the short-lived Neovim
   Claude Code opens. Long-running Neovim support is planned.
 - **Only the current prompt.** vergil can't see files attached earlier in the
   conversation.
 - **Pasted text looks like typed text.** An `@word` in a pasted log may be
   reported as a missing file, which is why that check is only Info.
-- **Sizes are estimates.** The large-attachment warning estimates tokens from
-  bytes. Claude Code's real limit is near 25k tokens and depends on content.
+- **Sizes are estimates.** The large-attachment note estimates tokens from
+  bytes; the agent's real limit depends on content.
 - **Mentions are a convention.** Claude followed `` `file#L12-L35` `` in
   testing, but nothing enforces it, and it hasn't been measured across many
   prompts.
@@ -303,9 +348,6 @@ See `:help vergil` for details.
 - **Format-on-save breaks pasted text.** Claude Code collapses unchanged pastes
   again after editing. Trimming whitespace or reformatting on save stops that,
   so `:checkhealth vergil` warns about it.
-- **A paste at the very end of the prompt stays expanded** after `Ctrl+G`,
-  even with plain Neovim and no changes. That's Claude Code. Text after the
-  paste avoids it.
 - Tested on macOS. Linux should work; Windows is untested.
 
 ## Troubleshooting
@@ -364,9 +406,9 @@ Something rewrote the prompt on save, such as format-on-save or trailing
 whitespace trimming. Exclude `claude-prompt-*.md`; `:checkhealth vergil` lists
 what it finds.
 
-### The large-file warning appears for a file that attached fine
+### The large-file note appears for a file that attached fine
 
-The warning uses an estimate. Raise `diagnostics.attachment_token_warning`,
+The note uses an estimate. Raise `diagnostics.attachment_token_warning`,
 or turn the check off with `severity.large = false`.
 
 ## Contributing

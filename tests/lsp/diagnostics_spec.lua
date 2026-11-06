@@ -41,7 +41,8 @@ return {
     local d = diags({ "@big.txt" })
     h.eq(d[1].code, "large")
     h.truthy(d[1].message:find("~23k tokens, 68 KB", 1, true), d[1].message)
-    h.truthy(d[1].message:find("silently drop", 1, true))
+    h.truthy(d[1].message:find("may skip or cut", 1, true))
+    h.eq(d[1].severity, S.INFO)
   end,
   ["range past the end, ignored range, missing targets"] = function()
     h.eq(codes({ "`src/a.ts#L2-L9`", "@src/a.ts#L1", "`nope/x.ts`", "@nope.ts" }), { "range", "ignored_range", "missing_mention", "missing_attachment" })

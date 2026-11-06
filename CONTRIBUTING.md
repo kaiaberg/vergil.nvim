@@ -14,5 +14,9 @@
 ## Tests
 
 - `make test` runs the unit and headless specs (`tests/**/*_spec.lua`) with the bundled runner.
-- `make contract` runs the Claude Code contract suite, and `make handoff` the end-to-end `Ctrl+G` test through vergil. Both drive a real `claude` session in tmux and cost a few small API calls, so run them manually, and again after Claude Code updates.
+- `make contract` runs the Claude Code contract suite, and `make handoff` the end-to-end `Ctrl+G` test through vergil. Both drive a real `claude` session in tmux and cost a few small API calls. Run them locally after Claude Code updates; both exit non-zero if a check fails. `make verify` runs both and, if they pass, records the Claude Code version in `lua/vergil/adapters/claude/verified.lua` and the docs.
 - Run `make test` on the oldest supported Neovim (0.11) as well as the latest release.
+
+## Continuous integration
+
+- **Tests** (`.github/workflows/tests.yml`) runs `make test` on every push and pull request: Neovim 0.11.7, stable and nightly on Linux, and stable on macOS. `VERGIL_PERF_FACTOR=3` loosens the timing limits on the shared runners.
