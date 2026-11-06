@@ -1,0 +1,42 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Neovim ${{ matrix.nvim }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        nvim: [v0.11.7, stable, nightly]
+        include:
+          - os: macos-latest
+            nvim: stable
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.nvim }}
+
+      - name: Versions
+        run: |
+          nvim --version | head -1
+          git --version
+
+      - name: Run tests
+        env:
+          VERGIL_PERF_FACTOR: "3"
+        run: make test

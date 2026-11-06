@@ -2,6 +2,9 @@
 local h = require("helpers")
 local parser = require("vergil.reference.parser")
 
+-- Shared CI machines are slower; VERGIL_PERF_FACTOR loosens the limits there.
+local FACTOR = tonumber(vim.env.VERGIL_PERF_FACTOR) or 1
+
 local function ms(fn)
   local t = vim.uv.hrtime()
   fn()
@@ -70,14 +73,14 @@ return {
     end
     require("vergil.files").invalidate(root)
     require("vergil").setup({})
-    h.truthy(worst < 150, ("slowest keystroke took %.1f ms"):format(worst))
+    h.truthy(worst < 150 * FACTOR, ("slowest keystroke took %.1f ms"):format(worst))
   end,
   ["discovery never blocks: list() returns before the scan finishes"] = function()
     local root, listing = big_repo(20000)
     require("vergil").setup({ root = root, files = { command = { "sh", "-c", "sleep 0.3; cat " .. listing } } })
     local done = false
     local t = ms(function() require("vergil.files").list(root, function() done = true end) end)
-    h.truthy(t < 20, ("list() blocked for %.1f ms"):format(t))
+    h.truthy(t < 20 * FACTOR, ("list() blocked for %.1f ms"):format(t))
     h.eq(done, false)
     vim.wait(3000, function() return done end)
     h.eq(done, true)
@@ -92,7 +95,7 @@ return {
     local refs
     local t = ms(function() refs = parser.parse(lines, h.opts()) end)
     h.eq(#refs, 10000)
-    h.truthy(t < 250, ("parse took %.1f ms"):format(t))
+    h.truthy(t < 250 * FACTOR, ("parse took %.1f ms"):format(t))
   end,
 
   -- Error handling ----------------------------------------------------------

@@ -30,13 +30,20 @@ SH
 chmod +x "$W/editor.sh"
 
 tmux new-session -d -s "$S" -x 160 -y 40 -c "$W/work" "VISUAL=$W/editor.sh claude --tools '' --session-id $U"
-trap 'tmux kill-session -t "$S" 2>/dev/null || true' EXIT
+cleanup() {
+  local rc=$?
+  if [ "$rc" -ne 0 ]; then echo "--- last screen ---"; tmux capture-pane -p -t "$S" 2>/dev/null || true; fi
+  tmux kill-session -t "$S" 2>/dev/null || true
+  return "$rc"
+}
+trap cleanup EXIT
 sleep 8
 if tmux capture-pane -p -t "$S" | grep -q 'trust this folder'; then tmux send-keys -t "$S" Down Enter; sleep 5; fi
 
 typ() { local s="$1" i; for ((i=0; i<${#s}; i++)); do tmux send-keys -t "$S" -l "${s:$i:1}"; sleep 0.15; done; sleep 0.8; }
 pane() { tmux capture-pane -p -t "$S"; }
-check() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1 (expected $2, got $3)"; fi; }
+FAILS=0
+check() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1 (expected $2, got $3)"; FAILS=$((FAILS + 1)); fi; }
 
 # 1-3: compose with completion and line selection, then submit with ZZ.
 tmux send-keys -t "$S" C-g; sleep 3
@@ -79,3 +86,4 @@ tmux send-keys -t "$S" Z Z; sleep 2
 check "paste collapses again after editing around it" yes "$(pane | grep -q 'EDITED Intro text. \[Pasted text #1 +30 lines\]' && echo yes || echo no)"
 tmux send-keys -t "$S" C-u
 echo "transcript: $T"
+[ "$FAILS" -eq 0 ] || { echo "$FAILS check(s) failed"; exit 1; }

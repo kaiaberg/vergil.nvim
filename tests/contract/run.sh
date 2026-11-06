@@ -34,7 +34,13 @@ SH
 chmod +x "$W/editor.sh"; echo 0 > "$W/exit"
 
 tmux new-session -d -s "$S" -x 180 -y 50 -c "$W/work" "EDITOR=$W/editor.sh claude --tools '' --session-id $U"
-trap 'tmux kill-session -t "$S" 2>/dev/null || true' EXIT
+cleanup() {
+  local rc=$?
+  if [ "$rc" -ne 0 ]; then echo "--- last screen ---"; tmux capture-pane -p -t "$S" 2>/dev/null || true; fi
+  tmux kill-session -t "$S" 2>/dev/null || true
+  return "$rc"
+}
+trap cleanup EXIT
 sleep 8
 if tmux capture-pane -p -t "$S" | grep -q 'trust this folder'; then tmux send-keys -t "$S" Down Enter; sleep 5; fi
 
@@ -44,7 +50,8 @@ send() { # $1 = prompt text
 }
 T() { ls ~/.claude/projects/*/"$U".jsonl; }
 has() { grep -q "$1" "$(T)"; }
-check() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1 (expected $2, got $3)"; fi; }
+FAILS=0
+check() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1 (expected $2, got $3)"; FAILS=$((FAILS + 1)); fi; }
 yn() { if has "$1"; then echo yes; else echo no; fi; }
 
 send $'Contract test. Reply OK.\n\n@ctrl.txt\n\n@"my file.txt"\n\n```java\n@Override\n```\n\nSee `small.txt#L1`.'
@@ -71,3 +78,4 @@ tmux send-keys -t "$S" 'ORIGINAL_PROMPT'; sleep 1; tmux send-keys -t "$S" C-g; s
 check ":w then non-zero exit restores prompt" yes "$(tmux capture-pane -p -t "$S" | grep -q 'ORIGINAL_PROMPT' && echo yes || echo no)"
 tmux send-keys -t "$S" C-u
 echo "transcript: $(T)"
+[ "$FAILS" -eq 0 ] || { echo "$FAILS check(s) failed"; exit 1; }
