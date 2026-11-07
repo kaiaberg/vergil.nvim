@@ -48,6 +48,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- File discovery no longer lists ignored files when `.gitignore` ignores
+  the whole root (e.g. `*`): an empty answer from rg, fd or git is kept
+  instead of falling through to the built-in scan, which would show `.env`
+  and the like. Listing ignored files takes an explicit `files.command`;
+  `:checkhealth vergil` mentions it when the root has no files.
 - `:checkhealth vergil` waits up to 3 seconds for the agent's `--version`,
   instead of 1, so a slow start no longer hides the version check.
 

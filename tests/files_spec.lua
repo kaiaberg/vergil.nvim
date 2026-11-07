@@ -28,14 +28,32 @@ return {
     h.eq(vim.tbl_contains(got, "ignored.log"), false)
     files.invalidate(root)
   end,
-  ["custom command wins; empty output falls through"] = function()
+  ["custom command wins; empty output is kept, a failure falls through"] = function()
     local root = h.tree({ ["real.ts"] = "" })
     config.set({ files = { command = { "printf", "custom/one.ts\\ncustom/two.ts\\n" } } })
     h.eq(list_sync(root), { "custom/one.ts", "custom/two.ts" })
     files.invalidate(root)
     config.set({ files = { command = { "true" } } })
+    h.eq(list_sync(root), {})
+    files.invalidate(root)
+    config.set({ files = { command = { "false" } } })
     h.eq(list_sync(root), { "real.ts" })
     files.invalidate(root)
+    config.set({})
+  end,
+  ["a root .gitignore ignores entirely lists nothing, not ignored files"] = function()
+    if vim.fn.executable("git") ~= 1 then return end
+    local root = h.tree({ [".env"] = "SECRET=1\n", ["sub/a.lua"] = "", [".gitignore"] = "*\n" })
+    vim.system({ "git", "init", "-q" }, { cwd = root }):wait()
+    h.eq(list_sync(root), {})
+    h.eq(files.backend(root) ~= "builtin", true)
+    files.invalidate(root)
+    -- Ignored files only on request.
+    config.set({ files = { command = { "rg", "--files", "--hidden", "--no-ignore", "--glob", "!.git" } } })
+    if vim.fn.executable("rg") == 1 then
+      h.eq(list_sync(root), { ".env", ".gitignore", "sub/a.lua" })
+      files.invalidate(root)
+    end
     config.set({})
   end,
   ["concurrent requests share one scan and get the same result"] = function()

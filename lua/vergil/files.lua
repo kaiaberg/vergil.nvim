@@ -1,9 +1,12 @@
 --- Asynchronous file discovery for a root directory.
 ---
---- Backends, first that works wins: the configured command, `rg`, `fd`,
+--- Backends, first that runs wins: the configured command, `rg`, `fd`,
 --- `git ls-files`, then a built-in scan. `rg`, `fd` and git respect
---- `.gitignore`. Empty output counts as failure, because a root inside a repo
---- that ignores it makes `git ls-files` succeed with nothing (M0 lesson 4).
+--- `.gitignore`. A backend that runs and finds nothing is an answer, not a
+--- failure: in a root that `.gitignore` ignores entirely (`*`, or a root
+--- inside a repo that ignores it), the list is empty rather than falling
+--- through to the built-in scan, which would show ignored files such as
+--- `.env`. Showing ignored files takes an explicit `files.command`.
 ---
 --- Results are cached per root and refreshed in the background once stale,
 --- so typing never waits on a scan after the first one. Concurrent requests
@@ -33,7 +36,8 @@ local function backends()
   if custom then
     list[#list + 1] = { name = "command", cmd = custom }
   end
-  list[#list + 1] = { name = "rg", cmd = { "rg", "--files", "--hidden", "--glob", "!.git" } }
+  -- rg exits 1 when there are no files, 2 on errors.
+  list[#list + 1] = { name = "rg", cmd = { "rg", "--files", "--hidden", "--glob", "!.git" }, empty_code = 1 }
   list[#list + 1] = { name = "fd", cmd = { "fd", "--type", "f", "--hidden", "--exclude", ".git" } }
   list[#list + 1] = { name = "git", cmd = { "git", "ls-files", "--cached", "--others", "--exclude-standard" } }
   return list
@@ -98,11 +102,12 @@ local function scan(root, cache)
         if cache.generation ~= generation then
           return
         end
-        local files = res.code == 0 and res.stdout and vim.split(res.stdout, "\n", { trimempty = true }) or {}
-        if #files == 0 then
-          return try_next()
+        local stdout = res.stdout or ""
+        local ran = res.code == 0 or (b.empty_code and res.code == b.empty_code and stdout == "")
+        if not ran then
+          return try_next() -- an error, a timeout, or not a git repository
         end
-        finish(root, cache, generation, files, b.name)
+        finish(root, cache, generation, vim.split(stdout, "\n", { trimempty = true }), b.name)
       end)
     end)
     if not ok then

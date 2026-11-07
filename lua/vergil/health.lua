@@ -49,16 +49,26 @@ local function check_files()
     end
   end
   if #found > 0 then
-    health.ok("Available: " .. table.concat(found, ", ") .. " (first one that returns files wins)")
+    health.ok("Available: " .. table.concat(found, ", ") .. " (first one that runs wins)")
   else
     health.warn(
       "No rg, fd or git: using the built-in scan, which ignores .gitignore",
       "Install ripgrep for faster discovery that respects .gitignore"
     )
   end
-  local backend = require("vergil.files").backend(require("vergil.session").root())
+  local root = require("vergil.session").root()
+  local files = require("vergil.files")
+  local backend = files.backend(root)
   if backend then
     health.info("Used for the session root: " .. backend)
+    local cached = files.cached(root)
+    if cached and #cached == 0 and backend ~= "command" then
+      health.info(
+        "No files found in the root: .gitignore may ignore all of it",
+        "To list ignored files too, set files.command, e.g. "
+          .. '{ "rg", "--files", "--hidden", "--no-ignore", "--glob", "!.git" }'
+      )
+    end
   end
 end
 

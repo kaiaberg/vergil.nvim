@@ -425,7 +425,10 @@ require("vergil").setup({
   skills = { extra_items = {} }, -- e.g. { { name = "compact", description = "Summarize the conversation" } }
   selector = { keys = { mention = "<CR>", snippet = "gs", both = "gb", symbols = "gO", cancel = { "q", "<Esc>" } } },
   completion = { native = false, reopen_on_backspace = true },
-  files = { command = nil }, -- custom discovery command run in the root, e.g. { "fd", "-t", "f" }
+  -- Custom discovery command run in the root, e.g. { "fd", "-t", "f" }. Files
+  -- that .gitignore ignores aren't listed; to list them too:
+  -- { "rg", "--files", "--hidden", "--no-ignore", "--glob", "!.git" }
+  files = { command = nil },
   keymaps = { preset = false },
   return_to_prompt = true, -- :q in a file opened from the prompt returns to the prompt
   picker = {

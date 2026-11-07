@@ -472,7 +472,11 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
                         Reopen the menu after Backspace inside a reference.
 `files.command`         Discovery command run in the root, printing one
                         relative path per line. Default: rg, fd, git, then a
-                        built-in scan.
+                        built-in scan; the first that runs wins, even when
+                        it finds nothing (a root that .gitignore ignores
+                        lists no files). To list ignored files too:
+                        `{ "rg", "--files", "--hidden", "--no-ignore",`
+                        `"--glob", "!.git" }`
 `keymaps.preset`        See |vergil-keymap-preset|.
 `return_to_prompt`      See |vergil-preview|.
 `picker.on_trigger`     Open the picker on `@` and `/`. See |vergil-picker|.
