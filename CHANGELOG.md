@@ -9,9 +9,15 @@ All notable changes are documented here. The format follows
 ### Added
 
 - One picker with tabs, built into vergil: All, Files, Changed, Commits and
-  Skills, with fuzzy search, a preview, marking across tabs, and cycling
-  tabs (`<C-Right>`/`<C-Left>`, `<C-l>`/`<C-h>`, `<M-l>`/`<M-h>`,
+  Skills, with fuzzy search, a preview, and cycling tabs
+  (`<C-Right>`/`<C-Left>`, `<C-l>`/`<C-h>`, `<M-l>`/`<M-h>`,
   `<M-1>`…`<M-9>`). `:Vergil pick [tab]` opens it on a tab (default All).
+- Marks in the picker show in every tab, with a sign (`@` attach,
+  `` ` `` mention, `/` skill, `◆` commit), and each keeps the attach/mention
+  mode it was marked with. A Marked panel lists them with the text each
+  inserts. `<C-o>` joins them with spaces, commas, or one per line.
+- `picker.keys` customizes every picker key, including `<C-t>`, `<C-o>`,
+  `<C-r>` and `<C-d>`.
 - `<C-g>` (preset, Insert mode) and `<Plug>(vergil-pick-expand)` turn the
   `@`, `@@` or `/` completion being typed into the picker, keeping the query.
 - `picker.on_trigger` opens the picker on `@` and `/` instead of inline

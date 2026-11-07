@@ -223,19 +223,29 @@ switch tabs.
 | Key | Does |
 |---|---|
 | `Enter` | insert the item, or every marked one |
-| `<Tab>` / `<S-Tab>` | mark / unmark, across tabs |
+| `<Tab>` / `<S-Tab>` | mark / unmark; a mark shows in every tab |
 | `<C-n>` `<C-p>` `<Down>` `<Up>` | move |
 | `<C-Right>` `<C-l>` `<M-l>` / `<C-Left>` `<C-h>` `<M-h>` | next / previous tab (cycles) |
 | `<M-1>`…`<M-9>` | go to a tab (`<C-1>`… where the terminal sends them) |
-| `<C-t>` | switch between attaching and mentioning files |
+| `<C-t>` | switch between attaching and mentioning files (for the next marks) |
+| `<C-o>` | join several items with spaces, commas, or one per line |
 | `<C-r>` | select lines of the file |
 | `<C-d>` | insert a commit's diff |
 | `<C-f>` / `<C-b>` | scroll the preview |
 | `Esc` | close |
 
+Marked items show a sign: `@` a file to attach, `` ` `` a file to mention,
+`/` a skill, `◆` a commit. Each mark keeps the attach/mention mode it was
+marked with, so you can mark some files to attach and others to mention. The
+**Marked** panel under the preview lists them in order, with the exact text
+each will insert.
+
 `<M-…>` keys need your terminal to send Option as Meta (iTerm2: Profiles →
-Keys). Change any of them with `picker.keys`, e.g.
-`picker = { keys = { next_tab = { "<C-l>" } } }`.
+Keys). Change any key with `picker.keys`, e.g.
+`picker = { keys = { next_tab = { "<C-l>" }, toggle_mode = { "<C-y>" } } }`.
+Names: `confirm`, `close`, `down`, `up`, `mark`, `unmark`, `next_tab`,
+`prev_tab`, `scroll_down`, `scroll_up`, `toggle_mode`, `separator`,
+`select_lines`, `diff`.
 
 `picker.on_trigger = true` opens the picker as soon as you type `@` or `/`
 where a reference can start, instead of the inline menu.

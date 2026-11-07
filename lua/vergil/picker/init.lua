@@ -4,8 +4,10 @@
 ---
 --- Tabs: All, Files, Changed (git), Commits (git), Skills. The git tabs are
 --- left out outside a repository. Files are inserted as attachments or
---- mentions (`<C-t>` switches), skills as `/name`, commits as
---- `` `abc1234` (subject) ``. `<Tab>` marks several items, from any tab.
+--- mentions (`<C-t>` switches; a marked file keeps the mode it was marked
+--- with), skills as `/name`, commits as `` `abc1234` (subject) ``. `<Tab>`
+--- marks several items, from any tab; `<C-o>` switches how they're joined:
+--- spaces, commas, or one per line.
 local config = require("vergil.config")
 local formatter = require("vergil.reference.formatter")
 
@@ -14,6 +16,22 @@ local M = {}
 --- `:Vergil pick` arguments: a tab, or `attach`/`mention` for Files in that
 --- mode.
 M.kinds = { "all", "attach", "mention", "skills", "changed", "commits" }
+
+--- Keys for vergil's own picker actions; `picker.keys` overrides them, like
+--- the generic ones in `vergil.ui.picker`.
+M.default_keys = {
+  toggle_mode = { "<C-t>" },
+  select_lines = { "<C-r>" },
+  diff = { "<C-d>" },
+  separator = { "<C-o>" },
+}
+
+--- How several items are joined, in the order `<C-o>` cycles through them.
+M.separators = {
+  { key = "space", sep = " ", label = "spaces" },
+  { key = "comma", sep = ", ", label = "commas" },
+  { key = "lines", sep = "\n", label = "one per line" },
+}
 
 local TAB_FOR = { all = "all", attach = "files", mention = "files", files = "files", skills = "skills", changed = "changed", commits = "commits" }
 
@@ -44,12 +62,16 @@ function M.insert(ctx, text)
     text = " " .. text
   end
   local pad = (after ~= "" and not after:match("%s") and not text:match("%s$")) and " " or ""
-  vim.api.nvim_buf_set_text(ctx.bufnr, ctx.row, col, ctx.row, stop, { text .. pad })
+  local parts = vim.split(text .. pad, "\n", { plain = true })
+  vim.api.nvim_buf_set_text(ctx.bufnr, ctx.row, col, ctx.row, stop, parts)
   if vim.api.nvim_win_is_valid(ctx.win) then
     vim.api.nvim_set_current_win(ctx.win)
-    local end_col = col + #text
-    local new_len = #line - (stop - col) + #text + #pad
-    vim.api.nvim_win_set_cursor(ctx.win, { ctx.row + 1, ctx.from_insert and end_col or math.max(0, end_col - 1) })
+    -- The cursor goes to the end of the inserted text (before the padding).
+    local last_row = ctx.row + #parts
+    local last = vim.split(text, "\n", { plain = true })
+    local end_col = (#parts == 1 and col or 0) + #last[#last]
+    local new_len = #(vim.api.nvim_buf_get_lines(ctx.bufnr, last_row - 1, last_row, false)[1] or "")
+    vim.api.nvim_win_set_cursor(ctx.win, { last_row, ctx.from_insert and end_col or math.max(0, end_col - 1) })
     if ctx.from_insert then
       vim.cmd(end_col >= new_len and "startinsert!" or "startinsert")
     end
@@ -69,24 +91,6 @@ function M.text_for(kind, value)
     return formatter.mention(value, nil, nil, config.options.mention.format)
   end
   return formatter.attachment(value, config.adapter())
-end
-
---- Text for several items: files in the current mode, skills and commits,
---- space-separated.
-local function text_for_items(items, mode)
-  local parts = {}
-  for _, item in ipairs(items) do
-    local kind = item.kind == "file" and mode or item.kind
-    local text = M.text_for(kind, item.value)
-    if text then
-      parts[#parts + 1] = vim.trim(text)
-    end
-  end
-  local text = table.concat(parts, " ")
-  if #items > 0 and items[#items].kind == "skills" and text ~= "" then
-    text = text .. " " -- ready for the skill's arguments
-  end
-  return text
 end
 
 local function read_head(abs, max)
@@ -133,7 +137,7 @@ local function build_tabs(session)
       local items = {}
       for _, path in ipairs(list or {}) do
         if keep(path) then
-          items[#items + 1] = { text = path, label = status[path], kind = "file", value = path }
+          items[#items + 1] = { id = "file:" .. path, text = path, label = status[path], kind = "file", value = path }
         end
       end
       cb(items)
@@ -141,21 +145,21 @@ local function build_tabs(session)
   end
   local function changed_items()
     return vim.tbl_map(function(f)
-      return { text = f.path, label = f.status, kind = "file", value = f.path }
+      return { id = "file:" .. f.path, text = f.path, label = f.status, kind = "file", value = f.path }
     end, changed or {})
   end
   local function skill_items()
     local trigger = config.options.triggers.skills
     return vim.tbl_map(function(s)
       local text = trigger .. s.name .. (s.description and ("  " .. s.description) or "")
-      return { text = text, label = s.kind, kind = "skills", value = s }
+      return { id = "skill:" .. s.name, text = text, label = s.kind, kind = "skills", value = s }
     end, require("vergil.skills").items(root))
   end
   local commits_cache
   local function commit_items()
     if not commits_cache then
       commits_cache = vim.tbl_map(function(c)
-        return { text = c.hash .. "  " .. c.subject, label = ("%s, %s"):format(c.author, c.date), kind = "commits", value = c }
+        return { id = "commit:" .. c.hash, text = c.hash .. "  " .. c.subject, label = ("%s, %s"):format(c.author, c.date), kind = "commits", value = c }
       end, git.commits(root) or {})
     end
     return commits_cache
@@ -237,7 +241,8 @@ function M.pick(kind, opts)
     ctx.row, ctx.col, ctx.end_col = opts.replace.row, opts.replace.start_col, opts.replace.end_col
   end
 
-  local state = { mode = kind == "mention" and "mention" or "attach" }
+  local state = { mode = kind == "mention" and "mention" or "attach", sep = 1 }
+  local keys = vim.tbl_extend("force", M.default_keys, config.options.picker.keys or {})
   local function has_files(t)
     return t.key == "all" or t.key == "files" or t.key == "changed"
   end
@@ -250,18 +255,42 @@ function M.pick(kind, opts)
     end
   end
 
+  local function key_hint(name)
+    local lhs = keys[name] and keys[name][1]
+    return lhs and (lhs:gsub("^<", ""):gsub(">$", "")) or nil
+  end
+
+  --- What a chosen item becomes: its sign in the list, the text it
+  --- inserts, and its kind. Files take the current attach/mention mode;
+  --- skills and commits are the same either way.
+  ---@return vergil.PickerMarkInfo
+  local function mark_info(item)
+    local mode = item.kind == "file" and state.mode or item.kind
+    local text = vim.trim(M.text_for(mode, item.value) or "")
+    local sign = ({ attach = "@", mention = "`", skills = "/", commits = "◆" })[mode] or "•"
+    local label = ({ attach = "attach", mention = "mention", skills = "skill", commits = "commit" })[mode]
+    return { sign = sign, text = text, label = label, data = { text = text, kind = item.kind } }
+  end
+
   require("vergil.ui.picker").open({
     tabs = tabs,
     tab = start,
     query = opts.query,
-    keys = config.options.picker.keys,
-    status = function()
-      local t = require("vergil.ui.picker").current()
-      local current = t and t.tab_spec() or tabs[start]
+    keys = keys,
+    mark_info = mark_info,
+    status = function(current)
+      local join = M.separators[state.sep].label
+      local join_hint = key_hint("separator")
+      local parts = {}
       if has_files(current) then
-        return state.mode == "mention" and "Mention (C-t: attach)" or "Attach (C-t: mention)"
+        local switch = key_hint("toggle_mode")
+        parts[#parts + 1] = (state.mode == "mention" and "Mention" or "Attach")
+          .. (switch and (" (%s: %s)"):format(switch, state.mode == "mention" and "attach" or "mention") or "")
+      else
+        parts[#parts + 1] = current.name
       end
-      return current.name
+      parts[#parts + 1] = "joined by " .. join .. (join_hint and (" (%s)"):format(join_hint) or "")
+      return table.concat(parts, " · ")
     end,
     preview = function(item)
       if item.kind == "file" then
@@ -275,7 +304,7 @@ function M.pick(kind, opts)
     end,
     actions = {
       {
-        keys = { "<C-t>" },
+        keys = keys.toggle_mode,
         desc = "attach/mention",
         when = has_files,
         fn = function(p)
@@ -284,7 +313,15 @@ function M.pick(kind, opts)
         end,
       },
       {
-        keys = { "<C-r>" },
+        keys = keys.separator,
+        desc = "join",
+        fn = function(p)
+          state.sep = state.sep % #M.separators + 1
+          p.refresh()
+        end,
+      },
+      {
+        keys = keys.select_lines,
         desc = "lines",
         when = has_files,
         fn = function(p)
@@ -302,7 +339,7 @@ function M.pick(kind, opts)
         end,
       },
       {
-        keys = { "<C-d>" },
+        keys = keys.diff,
         desc = "diff",
         when = function(t) return t.key == "commits" or t.key == "all" end,
         fn = function(p)
@@ -322,13 +359,23 @@ function M.pick(kind, opts)
         end,
       },
     },
-    on_confirm = function(items)
-      local text = text_for_items(items, state.mode)
-      if text ~= "" then
-        M.insert(ctx, text)
-      else
-        resume()
+    on_confirm = function(marks)
+      local texts = {}
+      for _, m in ipairs(marks) do
+        if m.info.data.text ~= "" then
+          texts[#texts + 1] = m.info.data.text
+        end
       end
+      if #texts == 0 then
+        return resume()
+      end
+      local sep = M.separators[state.sep]
+      local text = table.concat(texts, sep.sep)
+      -- Ready for a skill's arguments, unless each item has its own line.
+      if marks[#marks].info.data.kind == "skills" and sep.key ~= "lines" then
+        text = text .. " "
+      end
+      M.insert(ctx, text)
     end,
     on_cancel = resume,
   })

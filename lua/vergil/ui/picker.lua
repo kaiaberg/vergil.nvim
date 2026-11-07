@@ -1,15 +1,29 @@
---- A small tabbed fuzzy picker: a search line, a list and a preview, in
---- floats. It knows nothing about vergil; `vergil.picker` supplies the tabs.
+--- A small tabbed fuzzy picker: a search line, a list, a preview and a list
+--- of marked items, in floats. It knows nothing about vergil;
+--- `vergil.picker` supplies the tabs and what marks mean.
 ---
 --- Typing filters the current tab with `matchfuzzypos`. Tabs cycle, and the
---- query is kept when switching. Items can be marked to confirm several.
+--- query is kept when switching. Marks belong to what an item is (its `id`),
+--- not to a tab, so an item marked in one tab is marked in all of them. Each
+--- mark keeps a snapshot (`mark_info`) taken when it was marked.
 local M = {}
 
 ---@class vergil.PickerItem
+---@field id string identity across tabs, e.g. "file:src/a.lua"
 ---@field text string searched and shown
 ---@field label string? shown right-aligned, e.g. "modified" or "skill"
 ---@field kind string? what the item is, for the caller
 ---@field value any
+
+---@class vergil.PickerMarkInfo
+---@field sign string one or two characters shown before a marked item
+---@field text string shown in the marked list, e.g. what will be inserted
+---@field label string? shown right-aligned in the marked list
+---@field data any for the caller, e.g. the text to insert
+
+---@class vergil.PickerMark
+---@field item vergil.PickerItem
+---@field info vergil.PickerMarkInfo
 
 ---@class vergil.PickerTab
 ---@field key string
@@ -29,11 +43,12 @@ local M = {}
 ---@field tabs vergil.PickerTab[]
 ---@field tab integer? 1-based tab to start on
 ---@field query string?
----@field status (fun(): string)? text in the search line's title
+---@field status (fun(tab: vergil.PickerTab): string)? text in the search line's title
 ---@field preview (fun(item: vergil.PickerItem): { lines: string[], ft: string?, line: integer? }?)?
+---@field mark_info fun(item: vergil.PickerItem): vergil.PickerMarkInfo snapshot when marking (and for an unmarked choice)
 ---@field actions vergil.PickerAction[]?
 ---@field keys table<string, string[]>?
----@field on_confirm fun(items: vergil.PickerItem[], tab: vergil.PickerTab)
+---@field on_confirm fun(marks: vergil.PickerMark[], tab: vergil.PickerTab)
 ---@field on_cancel fun()?
 
 ---@class vergil.PickerState
@@ -43,11 +58,11 @@ local M = {}
 ---@field matches vergil.PickerItem[]
 ---@field positions integer[][]
 ---@field selected integer
----@field marked vergil.PickerItem[]
+---@field marked vergil.PickerMark[] in the order they were marked
 ---@field closed boolean
 
 M.limit = 500
---- The preview shows when the picker is at least this wide.
+--- The preview (and marked list) show when the picker is at least this wide.
 M.preview_min_width = 80
 
 local ns = vim.api.nvim_create_namespace("vergil.picker")
@@ -94,7 +109,31 @@ local function scratch()
 end
 
 local function key_label(lhs)
-  return (lhs:gsub("^<", ""):gsub(">$", ""):gsub("CR", "Enter"):gsub("^C%-", "C-"))
+  return (lhs:gsub("^<", ""):gsub(">$", ""):gsub("CR", "Enter"))
+end
+
+--- `text` cut to `width` display cells, with an ellipsis.
+local function fit(text, width)
+  if vim.fn.strdisplaywidth(text) <= width then
+    return text
+  end
+  return vim.fn.strcharpart(text, 0, math.max(1, width - 1)) .. "…"
+end
+
+--- A line with `left` and a right-aligned `label`, `width` cells wide.
+---@return string line
+---@return integer left_len bytes of the (fitted) left part
+---@return integer? label_start byte column of the label
+local function columns(left, label, width)
+  label = label or ""
+  local room = width - (label ~= "" and vim.fn.strdisplaywidth(label) + 2 or 0)
+  left = fit(left, math.max(1, room))
+  if label == "" then
+    return left, #left, nil
+  end
+  local pad = math.max(1, width - vim.fn.strdisplaywidth(left) - vim.fn.strdisplaywidth(label))
+  local line = left .. string.rep(" ", pad) .. label
+  return line, #left, #line - #label
 end
 
 ---@param opts vergil.PickerOpts
@@ -119,18 +158,23 @@ function M.open(opts)
   active = P
   local origin = vim.api.nvim_get_current_win()
 
-  -- Layout: list with the tab bar on top, search line below, preview right.
+  -- Layout: list with the tab bar on top and the search line below it; on
+  -- the right, the preview above the marked list.
   local cols, lines = vim.o.columns, vim.o.lines - vim.o.cmdheight
   local width = math.min(cols - 4, math.max(40, math.floor(cols * 0.9)))
   local height = math.min(lines - 4, math.max(10, math.floor(lines * 0.8)))
   local row = math.max(0, math.floor((lines - height) / 2) - 1)
   local col = math.max(0, math.floor((cols - width) / 2))
-  local with_preview = opts.preview and width >= M.preview_min_width
-  local list_w = with_preview and math.floor(width * 0.5) or width
+  local wide = width >= M.preview_min_width
+  local list_w = wide and math.floor(width * 0.5) or width
   local list_h = height - 3
+  local right_w = width - list_w - 2
+  local marks_h = wide and math.max(3, math.min(8, math.floor(height / 3))) or 0
+  local preview_h = height - marks_h - 2
 
   local list_buf, prompt_buf = scratch(), scratch()
-  local preview_buf = with_preview and scratch() or nil
+  local preview_buf = wide and opts.preview and scratch() or nil
+  local marks_buf = wide and scratch() or nil
   local base = { relative = "editor", style = "minimal", border = "rounded", zindex = 60 }
   local list_win = vim.api.nvim_open_win(list_buf, false, vim.tbl_extend("force", base, {
     row = row, col = col, width = list_w, height = list_h, title = " ", title_pos = "left", focusable = false,
@@ -139,19 +183,26 @@ function M.open(opts)
     row = row + list_h + 2, col = col, width = list_w, height = 1, title = " ", title_pos = "left",
     footer = " ", footer_pos = "left",
   }))
-  local preview_win
+  local preview_win, marks_win
   if preview_buf then
     preview_win = vim.api.nvim_open_win(preview_buf, false, vim.tbl_extend("force", base, {
-      row = row, col = col + list_w + 2, width = width - list_w - 2, height = height,
+      row = row, col = col + list_w + 2, width = right_w, height = preview_h,
       title = " Preview ", title_pos = "center", focusable = false,
     }))
     vim.wo[preview_win].number = true
     vim.wo[preview_win].wrap = false
   end
+  if marks_buf then
+    marks_win = vim.api.nvim_open_win(marks_buf, false, vim.tbl_extend("force", base, {
+      row = row + (preview_win and preview_h + 2 or 0), col = col + list_w + 2, width = right_w,
+      height = preview_win and marks_h or height, title = " Marked ", title_pos = "left", focusable = false,
+    }))
+    vim.wo[marks_win].wrap = false
+  end
   vim.wo[list_win].cursorline = true
   vim.wo[list_win].wrap = false
-  P.wins = { list = list_win, prompt = prompt_win, preview = preview_win }
-  P.bufs = { list = list_buf, prompt = prompt_buf, preview = preview_buf }
+  P.wins = { list = list_win, prompt = prompt_win, preview = preview_win, marks = marks_win }
+  P.bufs = { list = list_buf, prompt = prompt_buf, preview = preview_buf, marks = marks_buf }
 
   local function tab()
     return opts.tabs[P.tab]
@@ -161,13 +212,13 @@ function M.open(opts)
     return P.matches[P.selected]
   end
 
-  local function is_marked(item)
-    for _, m in ipairs(P.marked) do
-      if m == item then
-        return true
+  ---@return vergil.PickerMark?, integer?
+  local function mark_of(item)
+    for i, m in ipairs(P.marked) do
+      if m.item.id == item.id then
+        return m, i
       end
     end
-    return false
   end
 
   local function render_tabs()
@@ -179,24 +230,54 @@ function M.open(opts)
     vim.api.nvim_win_set_config(list_win, { title = chunks, title_pos = "left" })
   end
 
+  local function render_marks()
+    if not marks_buf or not vim.api.nvim_buf_is_valid(marks_buf) then
+      return
+    end
+    local out, hls = {}, {}
+    if #P.marked == 0 then
+      out = { "  " .. key_label(keys.mark[1]) .. " marks items to insert together" }
+    else
+      for i, m in ipairs(P.marked) do
+        local line, _, label_start = columns(m.info.sign .. " " .. m.info.text, m.info.label, right_w - 1)
+        out[i] = line
+        hls[i] = { sign = #m.info.sign, label = label_start }
+      end
+    end
+    vim.bo[marks_buf].modifiable = true
+    vim.api.nvim_buf_set_lines(marks_buf, 0, -1, false, out)
+    vim.bo[marks_buf].modifiable = false
+    vim.api.nvim_buf_clear_namespace(marks_buf, ns, 0, -1)
+    for i, h in pairs(hls) do
+      vim.api.nvim_buf_set_extmark(marks_buf, ns, i - 1, 0, { end_col = h.sign, hl_group = "VergilPickerMark" })
+      if h.label then
+        vim.api.nvim_buf_set_extmark(marks_buf, ns, i - 1, h.label, { end_col = #out[i], hl_group = "VergilPickerLabel" })
+      end
+    end
+    vim.api.nvim_win_set_config(marks_win, {
+      title = #P.marked > 0 and (" Marked (%d) "):format(#P.marked) or " Marked ",
+      title_pos = "left",
+    })
+  end
+
   local function render_status()
-    local status = opts.status and opts.status() or nil
-    local marked = #P.marked > 0 and (" %d marked "):format(#P.marked) or ""
+    local status = opts.status and opts.status(tab()) or "Search"
+    local marked = (#P.marked > 0 and not marks_win) and (" %d marked "):format(#P.marked) or ""
     vim.api.nvim_win_set_config(prompt_win, {
-      title = { { (" %s "):format(status or "Search"), "FloatTitle" }, { marked, "VergilPickerMark" } },
+      title = { { (" %s "):format(status), "FloatTitle" }, { marked, "VergilPickerMark" } },
       title_pos = "left",
     })
     -- Key hints, fitted to the width: action hints go first, then "mark".
     local prev, next = key_label(keys.prev_tab[1]), key_label(keys.next_tab[1])
-    local common = prev:match("^(%a%-)") == next:match("^(%a%-)") and prev:match("^(%a%-)") or nil
-    local tabs_hint = (common and (prev .. "/" .. next:sub(#common + 1)) or (prev .. "/" .. next)) .. " tabs"
+    local common = prev:match("^(%a%-)")
+    local tabs_hint = ((common and next:match("^(%a%-)") == common) and (prev .. "/" .. next:sub(#common + 1)) or (prev .. "/" .. next)) .. " tabs"
     local actions = {}
     for _, a in ipairs(opts.actions or {}) do
-      if a.desc and (not a.when or a.when(tab())) then
+      if a.desc and a.keys[1] and (not a.when or a.when(tab())) then
         actions[#actions + 1] = key_label(a.keys[1]) .. " " .. a.desc
       end
     end
-    local mark = { "Tab mark" }
+    local mark = { key_label(keys.mark[1]) .. " mark" }
     local function build()
       local hints = { "Enter insert" }
       vim.list_extend(hints, mark)
@@ -223,8 +304,7 @@ function M.open(opts)
       return
     end
     local item = current_item()
-    local res = item and opts.preview(item) or { lines = {} }
-    res = res or { lines = {} }
+    local res = (item and opts.preview(item)) or { lines = {} }
     vim.bo[preview_buf].modifiable = true
     vim.api.nvim_buf_set_lines(preview_buf, 0, -1, false, res.lines or {})
     vim.bo[preview_buf].modifiable = false
@@ -237,10 +317,10 @@ function M.open(opts)
       end
     end
     -- No :normal here: running Normal-mode commands while the picker opens
-    -- (inside a command, entering Insert mode) crashes Neovim 0.12.
+    -- (inside a command, entering Insert mode) is fragile.
     local last = math.max(1, #(res.lines or {}))
     local target = math.min(res.line or 1, last)
-    local top = res.line and math.max(1, target - math.floor(height / 2)) or 1
+    local top = res.line and math.max(1, target - math.floor(preview_h / 2)) or 1
     pcall(vim.api.nvim_win_set_cursor, preview_win, { target, 0 })
     vim.api.nvim_win_call(preview_win, function()
       vim.fn.winrestview({ topline = top, lnum = target })
@@ -268,18 +348,13 @@ function M.open(opts)
     elseif #P.matches == 0 then
       out = { "  No matches" }
     else
-      local inner = list_w - 1
       for i, item in ipairs(P.matches) do
-        local prefix = is_marked(item) and "● " or "  "
-        local label = item.label or ""
-        local avail = inner - #prefix - (label ~= "" and vim.fn.strdisplaywidth(label) + 2 or 0)
-        local text = item.text
-        if vim.fn.strdisplaywidth(text) > avail then
-          text = vim.fn.strcharpart(text, 0, math.max(1, avail - 1)) .. "…"
-        end
-        local pad = math.max(1, inner - #prefix - vim.fn.strdisplaywidth(text) - vim.fn.strdisplaywidth(label))
-        out[i] = prefix .. text .. (label ~= "" and (string.rep(" ", pad) .. label) or "")
-        hls[i] = { prefix = #prefix, text_len = #text, label_start = label ~= "" and (#out[i] - #label) or nil, marked = prefix ~= "  " }
+        local m = mark_of(item)
+        local sign = m and m.info.sign or ""
+        local prefix = sign .. string.rep(" ", math.max(1, 2 - vim.fn.strdisplaywidth(sign)))
+        local line, left_len, label_start = columns(prefix .. item.text, item.label, list_w - 1)
+        out[i] = line
+        hls[i] = { prefix = #prefix, sign = #sign, text_len = left_len - #prefix, label_start = label_start }
       end
     end
     vim.bo[list_buf].modifiable = true
@@ -287,14 +362,15 @@ function M.open(opts)
     vim.bo[list_buf].modifiable = false
     vim.api.nvim_buf_clear_namespace(list_buf, ns, 0, -1)
     for i, h in pairs(hls) do
-      if h.marked then
-        vim.api.nvim_buf_set_extmark(list_buf, ns, i - 1, 0, { end_col = 1, hl_group = "VergilPickerMark" })
+      if h.sign > 0 then
+        vim.api.nvim_buf_set_extmark(list_buf, ns, i - 1, 0, { end_col = h.sign, hl_group = "VergilPickerMark" })
       end
       for _, pos in ipairs(P.positions[i] or {}) do
         -- matchfuzzypos gives character indexes into the text.
-        local byte = vim.str_byteindex(P.matches[i].text, "utf-32", pos, false)
+        local text = P.matches[i].text
+        local byte = vim.str_byteindex(text, "utf-32", pos, false)
         if byte < h.text_len then
-          local stop = vim.str_byteindex(P.matches[i].text, "utf-32", pos + 1, false)
+          local stop = vim.str_byteindex(text, "utf-32", pos + 1, false)
           vim.api.nvim_buf_set_extmark(list_buf, ns, i - 1, h.prefix + byte, {
             end_col = h.prefix + math.min(stop, h.text_len), hl_group = "VergilPickerMatch",
           })
@@ -307,6 +383,7 @@ function M.open(opts)
     P.selected = math.max(1, math.min(P.selected, #P.matches))
     pcall(vim.api.nvim_win_set_cursor, list_win, { P.selected, 0 })
     render_status()
+    render_marks()
     schedule_preview()
   end
 
@@ -323,6 +400,16 @@ function M.open(opts)
     render_list()
   end
 
+  --- Picks up what was typed since the last TextChangedI (which only fires
+  --- when typing pauses), so actions always see the current query.
+  local function sync()
+    local q = vim.api.nvim_buf_is_valid(prompt_buf) and vim.api.nvim_buf_get_lines(prompt_buf, 0, 1, false)[1] or P.query
+    if q ~= P.query then
+      P.query = q
+      refilter()
+    end
+  end
+
   local function ensure_loaded(t)
     if t.items or t.loading or t.err then
       return
@@ -337,20 +424,9 @@ function M.open(opts)
     end)
   end
 
-  --- Picks up what was typed since the last TextChangedI (which only fires
-  --- when typing pauses), so actions always see the current query.
-  local function sync()
-    local q = vim.api.nvim_buf_is_valid(prompt_buf) and vim.api.nvim_buf_get_lines(prompt_buf, 0, 1, false)[1] or P.query
-    if q ~= P.query then
-      P.query = q
-      refilter()
-    end
-  end
-
   local function switch(i)
     sync()
-    local n = #opts.tabs
-    P.tab = ((i - 1) % n) + 1 -- cyclic
+    P.tab = ((i - 1) % #opts.tabs) + 1 -- cyclic
     render_tabs()
     ensure_loaded(tab())
     refilter()
@@ -375,7 +451,7 @@ function M.open(opts)
     if active == P then
       active = nil
     end
-    -- Only when in Insert mode: a pending :stopinsert would cancel the next
+    -- Only in Insert mode: a pending :stopinsert would cancel the next
     -- startinsert (e.g. of the next picker).
     if vim.api.nvim_get_mode().mode:sub(1, 1) == "i" then
       vim.cmd.stopinsert()
@@ -399,37 +475,38 @@ function M.open(opts)
 
   local function confirm()
     sync()
-    local chosen = #P.marked > 0 and vim.list_slice(P.marked) or { current_item() }
+    local chosen = vim.list_slice(P.marked)
     if #chosen == 0 then
-      return
+      local item = current_item()
+      if not item then
+        return
+      end
+      chosen = { { item = item, info = opts.mark_info(item) } }
     end
     local t = tab()
     P.close_windows()
     opts.on_confirm(chosen, t)
   end
-  P.confirm = confirm
-  P.cancel = cancel
-  P.current = current_item
-  P.tab_spec = tab
 
-  local function toggle_mark(on)
+  --- Marks (`on` true), unmarks (false) or toggles (nil) the current item.
+  local function set_mark(on)
     sync()
     local item = current_item()
     if not item then
       return
     end
-    for i, m in ipairs(P.marked) do
-      if m == item then
-        if on ~= true then
-          table.remove(P.marked, i)
-        end
-        render_list()
-        return
-      end
+    local _, i = mark_of(item)
+    if i and on ~= true then
+      table.remove(P.marked, i)
+    elseif not i and on ~= false then
+      P.marked[#P.marked + 1] = { item = item, info = opts.mark_info(item) }
     end
-    if on ~= false then
-      P.marked[#P.marked + 1] = item
-    end
+  end
+
+  P.confirm, P.cancel, P.current, P.tab_spec, P.sync = confirm, cancel, current_item, tab, sync
+  --- Re-renders after the caller changed something shown (e.g. the status).
+  function P.refresh()
+    render_list()
   end
 
   local map = function(lhs, fn)
@@ -441,7 +518,7 @@ function M.open(opts)
   for _, lhs in ipairs(keys.up) do map(lhs, function() move(-1) end) end
   for _, lhs in ipairs(keys.mark) do
     map(lhs, function()
-      toggle_mark()
+      set_mark()
       move(1)
       render_list()
     end)
@@ -449,7 +526,7 @@ function M.open(opts)
   for _, lhs in ipairs(keys.unmark) do
     map(lhs, function()
       move(-1)
-      toggle_mark(false)
+      set_mark(false)
       render_list()
     end)
   end
@@ -464,7 +541,7 @@ function M.open(opts)
       vim.api.nvim_win_call(preview_win, function()
         local view = vim.fn.winsaveview()
         local count = vim.api.nvim_buf_line_count(preview_buf)
-        local top = math.max(1, math.min(view.topline + dir * math.max(1, math.floor(height / 2)), count))
+        local top = math.max(1, math.min(view.topline + dir * math.max(1, math.floor(preview_h / 2)), count))
         vim.fn.winrestview({ topline = top, lnum = math.max(top, math.min(view.lnum, count)) })
       end)
     end
@@ -495,11 +572,6 @@ function M.open(opts)
       end)
     end,
   })
-
-  --- Re-renders after the caller changed something shown (e.g. the status).
-  function P.refresh()
-    render_list()
-  end
 
   vim.api.nvim_buf_set_lines(prompt_buf, 0, -1, false, { P.query })
   render_tabs()

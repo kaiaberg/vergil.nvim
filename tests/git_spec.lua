@@ -257,4 +257,20 @@ return {
     h.truthy(err and err ~= "", err)
     h.eq(git.revisions(empty), { "staged" })
   end,
+  ["a file marked in one tab is marked in the others"] = function()
+    local top = repo()
+    local b = prompt_in(top, { "" }, "git-crosstab")
+    open("changed")
+    feed("<Tab>") -- a.lua, the first changed file
+    feed("<M-1>")
+    vim.wait(2000, function() return ui.current().tab_spec().items ~= nil end)
+    local row = vim.tbl_filter(function(l) return l:find("a%.lua") end, shown())[1]
+    h.truthy(row:match("^@ a%.lua"), row)
+    feed("<M-4>") -- Commits
+    feed("<Tab>")
+    local marks = vim.api.nvim_buf_get_lines(ui.current().bufs.marks, 0, -1, false)
+    h.truthy(marks[2]:match("^◆ `%x+` %(init%)%s+commit$"), marks[2])
+    feed("<CR>")
+    h.truthy(text(b)[1]:match("^@a%.lua `%x+` %(init%)$"), text(b)[1])
+  end,
 }

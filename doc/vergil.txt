@@ -141,19 +141,27 @@ it on a tab; <C-g> (preset, Insert mode) opens it on what you're typing
 filter; the query stays when switching tabs, and tabs cycle.
 
   <CR>                      Insert the item, or every marked one
-  <Tab> <S-Tab>             Mark, unmark (across tabs)
+  <Tab> <S-Tab>             Mark, unmark; a mark shows in every tab
   <C-n> <C-p> <Down> <Up>   Move
   <C-Right> <C-l> <M-l>     Next tab
   <C-Left> <C-h> <M-h>      Previous tab
   <M-1> .. <M-9>            Go to a tab (<C-1>.. where the terminal sends it)
-  <C-t>                     Switch between attaching and mentioning files
+  <C-t>                     Switch between attaching and mentioning files,
+                            for the next marks
+  <C-o>                     Join several items with spaces, commas, or one
+                            per line
   <C-r>                     Select lines of the file
   <C-d>                     Insert a commit's diff
   <C-f> <C-b>               Scroll the preview
   <Esc> <C-c>               Close
 
+Marked items show a sign: `@` attach, `` ` `` mention, `/` skill, `◆` commit.
+A mark keeps the attach/mention mode it was marked with. The Marked panel
+under the preview lists the marks in order, with the text each inserts.
+
 `picker.keys` overrides keys: `{ next_tab = { "<C-l>" } }` (names: confirm,
-close, down, up, mark, unmark, next_tab, prev_tab, scroll_down, scroll_up).
+close, down, up, mark, unmark, next_tab, prev_tab, scroll_down, scroll_up,
+toggle_mode, separator, select_lines, diff).
 `picker.on_trigger = true` opens the picker on `@` and `/` instead of the
 inline menu.
 
