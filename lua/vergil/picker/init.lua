@@ -46,6 +46,7 @@ local TAB_FOR = {
 ---@field end_col integer? replace up to here (an expanded `@query`)
 ---@field root string
 ---@field from_insert boolean
+---@field cursor integer[] where the picker was opened: 1-based row, 0-based col
 
 --- Inserts text at the context's position (replacing `col..end_col` when
 --- set), with a space before it when needed, because agents only treat `@`
@@ -67,18 +68,47 @@ function M.insert(ctx, text)
   local pad = (after ~= "" and not after:match("%s") and not text:match("%s$")) and " " or ""
   local parts = vim.split(text .. pad, "\n", { plain = true })
   vim.api.nvim_buf_set_text(ctx.bufnr, ctx.row, col, ctx.row, stop, parts)
-  if vim.api.nvim_win_is_valid(ctx.win) then
+  -- The cursor goes to the end of the inserted text (before the padding).
+  local last = vim.split(text, "\n", { plain = true })
+  M.restore(ctx, ctx.row + #parts, (#parts == 1 and col or 0) + #last[#last])
+end
+
+--- Returns to the window and mode the picker was opened from: the cursor
+--- after column `end_col` (0-based, exclusive) of 1-based `row`, in Insert
+--- mode if that's where the picker came from. Deferred: closing the picker
+--- leaves its Insert mode only once the current key is handled, which would
+--- cancel a `startinsert` issued now.
+---@param ctx vergil.PickContext
+---@param row integer?
+---@param end_col integer?
+function M.restore(ctx, row, end_col)
+  local function go()
+    if not vim.api.nvim_win_is_valid(ctx.win) then
+      return
+    end
     vim.api.nvim_set_current_win(ctx.win)
-    -- The cursor goes to the end of the inserted text (before the padding).
-    local last_row = ctx.row + #parts
-    local last = vim.split(text, "\n", { plain = true })
-    local end_col = (#parts == 1 and col or 0) + #last[#last]
-    local new_len = #(vim.api.nvim_buf_get_lines(ctx.bufnr, last_row - 1, last_row, false)[1] or "")
-    vim.api.nvim_win_set_cursor(ctx.win, { last_row, ctx.from_insert and end_col or math.max(0, end_col - 1) })
-    if ctx.from_insert then
-      vim.cmd(end_col >= new_len and "startinsert!" or "startinsert")
+    if row and vim.api.nvim_buf_is_valid(ctx.bufnr) then
+      local len = #(vim.api.nvim_buf_get_lines(ctx.bufnr, row - 1, row, false)[1] or "")
+      vim.api.nvim_win_set_cursor(ctx.win, { row, ctx.from_insert and end_col or math.max(0, end_col - 1) })
+      if ctx.from_insert then
+        vim.cmd(end_col >= len and "startinsert!" or "startinsert")
+      end
+    elseif ctx.cursor and vim.api.nvim_buf_is_valid(ctx.bufnr) then
+      -- Back where the picker was opened.
+      pcall(vim.api.nvim_win_set_cursor, ctx.win, ctx.cursor)
+      if ctx.from_insert then
+        local len = #(vim.api.nvim_get_current_line())
+        vim.cmd(ctx.cursor[2] >= len and "startinsert!" or "startinsert")
+      end
     end
   end
+  go()
+  vim.schedule(function()
+    -- Unless a new picker opened, or you moved on, in the meantime.
+    if not require("vergil.ui.picker").current() and vim.api.nvim_get_current_win() == ctx.win then
+      go()
+    end
+  end)
 end
 
 --- Text to insert for a chosen item.
@@ -280,10 +310,15 @@ function M.pick(kind, opts)
   local row, col = unpack(vim.api.nvim_win_get_cursor(win))
   local from_insert = vim.api.nvim_get_mode().mode:sub(1, 1) == "i"
   local line = vim.api.nvim_get_current_line()
-  -- In Normal mode, insert after the cursor character, like `a`.
-  local insert_col = (from_insert or line == "") and col or math.min(col + 1, #line)
+  -- In Normal mode, insert after the word under the cursor, so it isn't
+  -- split; on whitespace, after the cursor character, like `a`.
+  local insert_col = col
+  if not from_insert and line ~= "" then
+    local word_end = line:find("%s", col + 1)
+    insert_col = line:sub(col + 1, col + 1):match("%s") and col + 1 or (word_end and word_end - 1 or #line)
+  end
   ---@type vergil.PickContext
-  local ctx = { bufnr = bufnr, win = win, row = row - 1, col = insert_col, root = session.root, from_insert = from_insert }
+  local ctx = { bufnr = bufnr, win = win, row = row - 1, col = insert_col, root = session.root, from_insert = from_insert, cursor = { row, col } }
   if opts.replace then
     ctx.row, ctx.col, ctx.end_col = opts.replace.row, opts.replace.start_col, opts.replace.end_col
   end
@@ -294,12 +329,7 @@ function M.pick(kind, opts)
     return t.key == "all" or t.key == "files" or t.key == "changed"
   end
   local function resume()
-    if vim.api.nvim_win_is_valid(ctx.win) then
-      vim.api.nvim_set_current_win(ctx.win)
-      if ctx.from_insert then
-        vim.cmd("startinsert")
-      end
-    end
+    M.restore(ctx)
   end
 
   local function key_hint(name)
@@ -435,9 +465,13 @@ function M.pick(kind, opts)
   return true
 end
 
---- Expands the inline completion being typed (`@query`, `@@query` or
---- `/query`) into the picker, on the matching tab, keeping the query. With
---- nothing being typed, opens the All tab.
+--- Opens the picker on what's at the cursor (`<C-g>`).
+--- Insert mode: the inline completion being typed (`@query`, `@@query` or
+--- `/query`) opens on its tab with that query; any other word before the
+--- cursor opens the All tab with the word as query. Either is replaced by
+--- what's chosen. Normal mode: a reference under the cursor opens with its
+--- path as query and is replaced; otherwise the All tab opens empty and
+--- inserts after the cursor.
 ---@param at { row: integer, col: integer }? 1-based row and the column the
 ---   typed text ends at; default: the cursor
 ---@return boolean ok
@@ -460,21 +494,80 @@ function M.expand(at)
   if cmp and cmp.close then
     pcall(cmp.close)
   end
-  local token = require("vergil.lsp.completion").typing_token(line, col)
+  local completion = require("vergil.lsp.completion")
+  local session = require("vergil.session").get(bufnr)
+  local function open(kind, query, start_col, end_col)
+    return M.pick(kind, { query = query, replace = { row = row - 1, start_col = start_col, end_col = end_col } })
+  end
+  local insert_mode = at ~= nil or vim.api.nvim_get_mode().mode:sub(1, 1) == "i"
+  -- Where the word ends that the cursor is in (0-based, exclusive). Not for
+  -- `picker.on_trigger` (`at`): an `@` just typed before a word starts a
+  -- new reference rather than taking the word over.
+  local stop = col
+  if not at then
+    local space = line:find("%s", col + 1)
+    stop = space and space - 1 or #line
+  end
+
+  if not insert_mode then
+    local ref = completion.existing_token(bufnr, row - 1, col, session.root, true)
+    if ref then
+      return open(ref.mode, ref.query, ref.start_col, ref.end_col)
+    end
+    local skill = require("vergil.skills").token_at(line, col)
+    if skill then
+      -- Up to the name: `token_at` leaves out trailing punctuation.
+      return open("skills", skill.name, skill.start_col, skill.start_col + #config.options.triggers.skills + #skill.name)
+    end
+    local s, e = M.word_at(line, col, stop)
+    if s then
+      return open("all", line:sub(s + 1, e), s, e)
+    end
+    return M.pick("all")
+  end
+
+  -- Insert mode: search for what's before the cursor, replace the whole
+  -- word (or reference), so no fragment of it is left behind.
+  local ref = not at and completion.existing_token(bufnr, row - 1, col, session.root)
+  if ref and ref.start_col < col then
+    return open(ref.mode, ref.query, ref.start_col, math.max(ref.end_col, col))
+  end
+  local token = completion.typing_token(line, col)
   if token then
-    return M.pick(token.mode, {
-      query = token.query,
-      replace = { row = row - 1, start_col = token.start_col, end_col = token.end_col },
-    })
+    return open(token.mode, token.query, token.start_col, stop)
   end
   local skill = require("vergil.skills").typing_token(line, col)
   if skill then
-    return M.pick("skills", {
-      query = skill.query,
-      replace = { row = row - 1, start_col = skill.start_col, end_col = skill.end_col },
-    })
+    return open("skills", skill.query, skill.start_col, stop)
+  end
+  if col > 0 and not line:sub(col, col):match("%s") then
+    local s, e = M.word_at(line, col - 1, stop)
+    if s and s < col then
+      return open("all", line:sub(s + 1, col), s, math.max(e, col))
+    end
   end
   return M.pick("all")
+end
+
+--- The word around 0-based column `col` (up to `stop`), without the
+--- punctuation around it in prose: `(parser),` gives `parser`.
+---@param line string
+---@param col integer
+---@param stop integer 0-based exclusive end of the whitespace-separated word
+---@return integer? start 0-based
+---@return integer? end_col 0-based, exclusive
+function M.word_at(line, col, stop)
+  if line:sub(col + 1, col + 1):match("^%s?$") then
+    return nil
+  end
+  local s = line:sub(1, col + 1):match("()%S+$") - 1
+  local word = line:sub(s + 1, stop)
+  local lead = #word:match("^[%(%[{\"'<]*")
+  local trail = #word:match("[%)%]}\"'>%.,;:!?]*$")
+  if lead + trail >= #word then
+    return nil
+  end
+  return s + lead, stop - trail
 end
 
 --- With `picker.on_trigger`, typing `@` or `/` where a reference may start

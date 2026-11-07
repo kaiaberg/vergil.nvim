@@ -91,8 +91,9 @@ end
 ---@param row integer
 ---@param col integer
 ---@param root string
+---@param whole boolean? the query is the whole path, not just up to the cursor
 ---@return vergil.CompletionToken?
-function M.existing_token(bufnr, row, col, root)
+function M.existing_token(bufnr, row, col, root, whole)
   local ref = parser.at(parser.parse_buffer(bufnr), row, col)
   if not ref or ref.resource or ref.in_fence then
     return nil
@@ -104,7 +105,7 @@ function M.existing_token(bufnr, row, col, root)
     end
   end
   local path_start = ref.span.start_col + ((ref.mode == "attach" and ref.quoted) and 2 or 1)
-  local upto = math.max(0, math.min(col - path_start, #ref.path))
+  local upto = whole and #ref.path or math.max(0, math.min(col - path_start, #ref.path))
   return { mode = ref.mode, start_col = ref.span.start_col, end_col = ref.span.end_col, query = ref.path:sub(1, upto) }
 end
 

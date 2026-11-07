@@ -50,6 +50,8 @@ end
 --- A prompt buffer with `text`, the cursor at `col` (Normal mode).
 local function prompt(text, col, name, setup)
   ui.close()
+  -- Let a deferred return to Insert mode (after a picker) happen first.
+  vim.wait(20)
   if vim.api.nvim_get_mode().mode:sub(1, 1) == "i" then
     feed("<Esc>")
   end
@@ -173,6 +175,121 @@ return {
     loaded()
     h.eq(tab_name(), "All")
     feed("<Esc>")
+    require("vergil").setup({ root = root })
+  end,
+  ["<C-g> after a plain word searches for it; Enter replaces it, Esc keeps it"] = function()
+    local preset = { keymaps = { preset = true } }
+    local b = prompt("look", 3, "pick-expand-word", preset)
+    feed("A src/a<C-g>")
+    loaded()
+    h.eq({ tab_name(), ui.current().query }, { "All", "src/a" })
+    feed("<CR>")
+    h.eq(line(b), "look @src/a.lua")
+    b = prompt("look", 3, "pick-expand-word-esc", preset)
+    feed("A src/a<C-g>")
+    loaded()
+    feed("<Esc>")
+    h.eq(line(b), "look src/a")
+    require("vergil").setup({ root = root })
+  end,
+  ["<C-g> inside a word searches what's before the cursor, replaces it all"] = function()
+    local preset = { keymaps = { preset = true } }
+    local b = prompt("x", 0, "pick-expand-inside-word", preset)
+    feed("A src/bxyz<Left><Left><Left><C-g>")
+    loaded()
+    h.eq({ tab_name(), ui.current().query }, { "All", "src/b" })
+    feed("<CR>")
+    h.eq(line(b), "x @src/b.lua")
+    b = prompt("x", 0, "pick-expand-inside-ref", preset)
+    feed("A @src/bxyz now<Left><Left><Left><Left><Left><Left><Left><C-g>")
+    loaded()
+    h.eq({ tab_name(), ui.current().query }, { "Files", "src/b" })
+    feed("<CR>")
+    h.eq(line(b), "x @src/b.lua now")
+    require("vergil").setup({ root = root })
+  end,
+  ["<C-g> in Normal mode: on a reference it searches and replaces, else All"] = function()
+    local preset = { keymaps = { preset = true } }
+    local b = prompt("see @src/b.lua now", 6, "pick-expand-normal", preset)
+    feed("<C-g>")
+    loaded()
+    h.eq({ tab_name(), ui.current().query }, { "Files", "src/b.lua" })
+    feed("Sa.lua<CR>")
+    h.eq(line(b), "see @src/a.lua now")
+    h.eq(vim.api.nvim_get_mode().mode, "n")
+    b = prompt("run /g. now", 6, "pick-expand-normal-skill", preset)
+    feed("<C-g>")
+    loaded()
+    h.eq({ tab_name(), ui.current().query }, { "Skills", "g" })
+    feed("<CR>")
+    h.eq(line(b), "run /go . now")
+    -- On a word: the whole word, without the punctuation around it.
+    b = prompt("check (b), then", 8, "pick-expand-normal-word", preset)
+    feed("<C-g>")
+    loaded()
+    h.eq({ tab_name(), ui.current().query }, { "All", "b" })
+    feed("<Esc>")
+    h.eq(line(b), "check (b), then", "Esc keeps it")
+    feed("<C-g>")
+    loaded()
+    feed("<CR>")
+    -- Spaced: agents only see `@` after whitespace.
+    h.eq(line(b), "check ( @src/b.lua ), then")
+    -- On whitespace: empty, inserted there.
+    b = prompt("plain text", 5, "pick-expand-normal-space", preset)
+    feed("<C-g>")
+    loaded()
+    h.eq({ tab_name(), ui.current().query }, { "All", "" })
+    feed("Aa.lua<CR>")
+    h.eq(line(b), "plain @src/a.lua text")
+    require("vergil").setup({ root = root })
+  end,
+  ["the picker returns to the mode it was opened from"] = function()
+    local preset = { keymaps = { preset = true } }
+    --- Where Insert mode was (re)entered in `b` after the picker opened.
+    local function entries(b)
+      local seen = {}
+      vim.api.nvim_create_autocmd("InsertEnter", {
+        buffer = b,
+        callback = function()
+          seen[#seen + 1] = vim.api.nvim_win_get_cursor(0)
+        end,
+      })
+      return seen
+    end
+    -- From Insert mode: Enter comes back in Insert mode after the text.
+    local b = prompt("see", 2, "pick-mode-insert", preset)
+    local seen = entries(b)
+    feed("A @src/a<C-g>")
+    loaded()
+    local before = #seen
+    feed("<CR>")
+    vim.wait(500, function()
+      return #seen > before
+    end)
+    h.eq(line(b), "see @src/a.lua")
+    h.eq(seen[#seen], { 1, 14 }, "Insert mode at the end of the text")
+    -- From Insert mode: Esc comes back in Insert mode where it was opened.
+    b = prompt("one two", 2, "pick-mode-insert-esc", preset)
+    seen = entries(b)
+    feed("a <C-g>")
+    loaded()
+    before = #seen
+    feed("<Esc>")
+    vim.wait(500, function()
+      return #seen > before
+    end)
+    h.eq(#seen > before, true, "back in Insert mode")
+    h.eq(seen[#seen], { 1, 4 }, "where the picker was opened")
+    -- From Normal mode: stays in Normal mode, cursor on the inserted text.
+    b = prompt("look", 3, "pick-mode-normal", preset)
+    seen = entries(b)
+    open("attach")
+    feed("Aa.lua<CR>")
+    vim.wait(100)
+    h.eq(#seen, 0, "no Insert mode")
+    h.eq(vim.api.nvim_get_mode().mode, "n")
+    h.eq(vim.api.nvim_win_get_cursor(0), { 1, 14 }, "on the last inserted character")
     require("vergil").setup({ root = root })
   end,
   ["picker.on_trigger opens the picker on @ instead of completion"] = function()

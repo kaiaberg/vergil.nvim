@@ -135,7 +135,9 @@ if (!token) {
 
 **Need more room? `<C-g>`** (with the preset) turns what you're typing into
 the full [picker](#the-picker): `@sess` opens the Files tab searching for
-`sess`, with a preview, and the other tabs one key away.
+`sess`, with a preview, and the other tabs one key away. Any other word
+before the cursor, like `sess`, opens the All tab searching for it. You come
+back in the mode you left.
 
 **`/` completes skills and commands**, from your project, your personal
 `~/.claude` and enabled plugins, with descriptions and argument hints.
@@ -225,7 +227,16 @@ picker = { tabs = { "all", "files", "changed", "skills" } } -- no branches or co
 Open it with `:Vergil pick [tab]` (`all`, `attach`, `mention`, `changed`,
 `branches`, `commits`, `skills`; default All, or the first tab), or press `<C-g>` (preset) while typing
 `@sess`, `@@sess` or `/rev`: it opens on the matching tab with what you typed,
-and replaces it with your choice. Type to filter; the query stays when you
+and replaces it with your choice. After any other word, it opens the All tab
+searching for that word, and replaces it too. Inside a word or reference, it
+searches for what's before the cursor and replaces the whole word, so no
+fragment is left. In Normal mode, `<C-g>` turns what's under the cursor into
+a reference: a reference or `/skill` searches for itself, any other word
+(without the punctuation around it) opens All searching for it; your choice
+replaces it. On whitespace it searches for nothing and inserts there.
+`:Vergil pick` from Normal mode inserts after the word under the cursor,
+never inside it. Choosing or closing the
+picker returns you to the mode you opened it from. Type to filter; the query stays when you
 switch tabs.
 
 | Key | Does |
@@ -399,7 +410,7 @@ vergil maps nothing unless you ask. Every action has a `<Plug>` mapping:
 |---|---|
 | `K` | Preview; pressed again, closes it (`preview.on_repeat = "focus"` moves into it instead, as Neovim's own `K` does) |
 | `gs` / `gb` | Snippet from a ranged reference: replace it / keep it and add the lines below |
-| `<C-g>` (Insert mode) | Open the picker on what you're typing |
+| `<C-g>` | Open the picker on what you're typing (Insert mode) or the word or reference under the cursor (Normal mode), and replace it with your choice |
 | `gf` / `<C-w>f` / `<C-w>gf` | Open the reference here / in a split / in a tab; the native key elsewhere |
 | `ZZ` / `ZQ` | `:Vergil submit` / `:Vergil abort` |
 | `<Esc>` | Close an open preview (also inside it); a normal `<Esc>` otherwise |

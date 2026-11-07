@@ -28,8 +28,16 @@ All notable changes are documented here. The format follows
   `:Vergil open` show `git show` or the branch's log in a read-only buffer.
 - `preview.on_repeat`: `K` (now in the preset) or `:Vergil preview` again
   closes the preview (default) or moves into it (`"focus"`).
-- `<C-g>` (preset, Insert mode) and `<Plug>(vergil-pick-expand)` turn the
-  `@`, `@@` or `/` completion being typed into the picker, keeping the query.
+- `<C-g>` (preset) and `<Plug>(vergil-pick-expand)` turn the `@`, `@@` or
+  `/` completion being typed into the picker, keeping the query; any other
+  word before the cursor opens the All tab searching for it. Either is
+  replaced by your choice; inside a word, the search is what's before the
+  cursor and the whole word is replaced. In Normal mode, `<C-g>` turns the
+  reference, `/skill` or word under the cursor into what you choose.
+- Choosing or closing the picker returns to the mode it was opened from:
+  Insert mode with the cursor after the inserted text, or Normal mode.
+- From Normal mode, the picker inserts after the word under the cursor
+  instead of splitting it.
 - `picker.on_trigger` opens the picker on `@` and `/` instead of inline
   completion; `picker.keys` overrides its keys.
 

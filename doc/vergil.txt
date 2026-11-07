@@ -138,9 +138,15 @@ The picker has tabs for everything that can go into a prompt: All, Files,
 Changed, Branches and Commits (in a git repository), and Skills;
 `picker.tabs` sets which and in what order (a tab left out is gone from All
 too). Branches insert `` `name` (branch) ``. |:Vergil-pick| opens
-it on a tab; <C-g> (preset, Insert mode) opens it on what you're typing
-(`@sess`, `@@sess`, `/rev`) and replaces that with your choice. Type to
-filter; the query stays when switching tabs, and tabs cycle.
+it on a tab; <C-g> (preset) in Insert mode opens it on what you're typing
+(`@sess`, `@@sess`, `/rev` on their tab, any other word on All) and
+replaces that with your choice; inside a word it searches for what's
+before the cursor and replaces the whole word. In Normal mode, <C-g> turns
+what's under the cursor into a reference: a reference, `/skill` or word
+(without surrounding punctuation) is the search and is replaced; on
+whitespace the search is empty and the choice goes there. From Normal mode,
+|:Vergil-pick| inserts after the word under the cursor, not inside it. Choosing or closing returns to the mode it was opened
+from. Type to filter; the query stays when switching tabs, and tabs cycle.
 
   <CR>                      Insert the item, or every marked one
   <Tab> <S-Tab>             Mark, unmark; a mark shows in every tab
@@ -408,7 +414,9 @@ Visual mode, where they send the selected lines.
   ZQ        |:Vergil-abort|
   <Esc>     Close an open preview, also when focused; a normal <Esc>
             otherwise
-  <C-g>     (Insert mode) Open the picker on what you're typing
+  <C-g>     Open the picker on what you're typing (Insert mode) or on
+            the word or reference under the cursor (Normal mode), and
+            replace it with your choice
 
 and, in Visual mode in other file buffers while a prompt is open, the line
 selector's keys (`selector.keys`):

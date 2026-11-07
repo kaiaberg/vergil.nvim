@@ -58,6 +58,11 @@ end
 --- A prompt in a fresh session rooted at `top`.
 local function prompt_in(top, lines, name)
   ui.close()
+  -- Let a deferred return to Insert mode (after a picker) happen first.
+  vim.wait(20)
+  if vim.api.nvim_get_mode().mode:sub(1, 1) == "i" then
+    vim.api.nvim_feedkeys(vim.keycode("<Esc>"), "xt", false)
+  end
   vim.cmd("silent! %bwipeout!")
   return h.prompt(top, lines, name)
 end
@@ -136,7 +141,7 @@ return {
     vim.api.nvim_win_set_cursor(0, { 1, 0 })
     open("changed")
     feed("<Tab><Tab><CR>")
-    h.eq(text(b), { "R @a.lua @c.lua eview this" })
+    h.eq(text(b), { "Review @a.lua @c.lua this" }) -- after the word, not inside it
   end,
   [":Vergil diff inserts all uncommitted changes as a diff block"] = function()
     local top = repo()

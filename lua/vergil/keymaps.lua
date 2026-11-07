@@ -15,6 +15,7 @@ M.preset = {
   { lhs = "ZZ", plug = "<Plug>(vergil-submit)", desc = "Submit the prompt" },
   { lhs = "ZQ", plug = "<Plug>(vergil-abort)", desc = "Abort: restore the prompt from before Ctrl+G" },
   { lhs = "<C-g>", plug = "<Plug>(vergil-pick-expand)", desc = "Open the picker on what you're typing", mode = "i" },
+  { lhs = "<C-g>", plug = "<Plug>(vergil-pick-expand)", desc = "Open the picker on the reference under the cursor" },
 }
 
 local group = vim.api.nvim_create_augroup("vergil.keymaps", { clear = true })
