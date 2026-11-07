@@ -132,12 +132,13 @@ local function check_prompt_safety()
   end
 end
 
---- The version an agent's `--version` prints, if it runs within a second.
+--- The version an agent's `--version` prints, if it answers within 3 seconds
+--- (agents written in Node can be slow to start).
 ---@param exe string
 ---@return string?
 function M.agent_version(exe)
   local ok, res = pcall(function()
-    return vim.system({ exe, "--version" }, { text = true }):wait(1000)
+    return vim.system({ exe, "--version" }, { text = true }):wait(3000)
   end)
   if not ok or res.code ~= 0 then
     return nil
@@ -186,16 +187,10 @@ end
 
 local function check_picker()
   health.start("Picker")
-  local backend = require("vergil.config").options.picker.backend
-  local has_telescope = pcall(require, "telescope")
-  if backend == "select" then
-    health.ok("Using vim.ui.select (picker.backend = \"select\")")
-  elseif has_telescope then
-    health.ok("Using telescope.nvim")
-  elseif backend == "telescope" then
-    health.warn("picker.backend = \"telescope\", but telescope.nvim isn't available; falling back to vim.ui.select")
-  else
-    health.info("telescope.nvim not found: :Vergil pick uses vim.ui.select (no <C-t>/<C-r>)")
+  local picker = require("vergil.config").options.picker
+  health.ok("Built-in picker" .. (picker.on_trigger and " (opens on @ and /)" or ""))
+  if picker.backend ~= nil then
+    health.warn("picker.backend is no longer used: vergil has its own picker", "Remove picker.backend from your setup")
   end
 end
 

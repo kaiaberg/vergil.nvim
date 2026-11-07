@@ -93,6 +93,71 @@ function M.changed(root)
   return out
 end
 
+---@class vergil.Commit
+---@field hash string abbreviated
+---@field subject string
+---@field author string
+---@field date string relative, e.g. "2 days ago"
+
+--- Recent commits that touched the root, newest first.
+---@param root string
+---@param limit integer?
+---@return vergil.Commit[]? commits
+---@return string? err
+function M.commits(root, limit)
+  local res, err = run(root, { "log", "-n", tostring(limit or 200), "--format=%h%x1f%s%x1f%an%x1f%ar", "--", "." })
+  if not res then
+    return nil, err
+  end
+  local out = {}
+  for line in (res.stdout or ""):gmatch("[^\n]+") do
+    local hash, subject, author, date = line:match("^([^\31]*)\31([^\31]*)\31([^\31]*)\31(.*)$")
+    if hash then
+      out[#out + 1] = { hash = hash, subject = subject, author = author, date = date }
+    end
+  end
+  return out
+end
+
+--- A commit as prompt text: `` `abc1234` (Fix token refresh) ``. The agent
+--- can run `git show` on the hash; the subject says what it is.
+---@param commit vergil.Commit
+---@return string
+function M.reference(commit)
+  local subject = vim.trim((commit.subject or ""):gsub("`", "'"))
+  return subject == "" and ("`%s`"):format(commit.hash) or ("`%s` (%s)"):format(commit.hash, subject)
+end
+
+--- `git show` for a commit, for previews.
+---@param root string
+---@param hash string
+---@return string[]
+function M.show(root, hash)
+  local res, err = run(root, { "show", "--stat", "--patch", "--no-color", "--no-ext-diff", hash, "--", "." })
+  if not res then
+    return { err }
+  end
+  return vim.split((res.stdout or ""):gsub("\n$", ""), "\n", { plain = true })
+end
+
+--- Completion candidates for `:Vergil diff`: `staged`, branches, tags and
+--- recent commits. Empty outside a repository.
+---@param root string
+---@return string[]
+function M.revisions(root)
+  local out = { "staged" }
+  local refs = run(root, { "for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/tags", "refs/remotes" })
+  for name in ((refs and refs.stdout) or ""):gmatch("[^\n]+") do
+    if not name:find("/HEAD$") then
+      out[#out + 1] = name
+    end
+  end
+  for _, c in ipairs(M.commits(root, 30) or {}) do
+    out[#out + 1] = c.hash
+  end
+  return out
+end
+
 --- `git diff` arguments for `:Vergil diff [staged|<rev>]`.
 ---@param what string? nil: all uncommitted changes; "staged"; or a revision or range
 ---@return string[]? args

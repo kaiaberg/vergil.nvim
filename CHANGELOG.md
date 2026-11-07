@@ -6,6 +6,35 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- One picker with tabs, built into vergil: All, Files, Changed, Commits and
+  Skills, with fuzzy search, a preview, marking across tabs, and cycling
+  tabs (`<C-Right>`/`<C-Left>`, `<C-l>`/`<C-h>`, `<M-l>`/`<M-h>`,
+  `<M-1>`…`<M-9>`). `:Vergil pick [tab]` opens it on a tab (default All).
+- `<C-g>` (preset, Insert mode) and `<Plug>(vergil-pick-expand)` turn the
+  `@`, `@@` or `/` completion being typed into the picker, keeping the query.
+- `picker.on_trigger` opens the picker on `@` and `/` instead of inline
+  completion; `picker.keys` overrides its keys.
+
+- `:Vergil pick commits`: recent commits that touched the root, with a
+  `git show` preview, inserted as `` `abc1234` (subject) ``; `<C-d>` inserts
+  the commit's diff instead, `<Tab>` marks several.
+- `:Vergil diff <Tab>` completes `staged`, branches, tags and recent commits.
+- README "Git" section: what vergil does with git, and which plugins to use
+  for the rest (fugitive, telescope, gitsigns, blink-cmp-git).
+
+### Changed
+
+- The picker no longer uses telescope.nvim or `vim.ui.select`, and
+  `picker.backend` is gone (`:checkhealth vergil` warns if it's still set).
+  `:Vergil pick` without an argument opens the All tab instead of Files.
+
+### Fixed
+
+- `:checkhealth vergil` waits up to 3 seconds for the agent's `--version`,
+  instead of 1, so a slow start no longer hides the version check.
+
 ## [0.2.0] - 2026-11-06
 
 Send lines back from files, reference functions by name, and review git

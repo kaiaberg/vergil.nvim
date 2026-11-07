@@ -106,6 +106,7 @@ function M.enable(bufnr)
   require("vergil.lsp.client").attach(bufnr)
   require("vergil.range").attach(bufnr)
   require("vergil.keymaps").attach(bufnr)
+  require("vergil.picker").attach_trigger(bufnr)
   vim.api.nvim_exec_autocmds("User", { pattern = "VergilEnable", data = { bufnr = bufnr }, modeline = false })
   return session
 end

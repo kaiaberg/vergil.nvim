@@ -16,7 +16,7 @@ local M = {}
 ---@field completion { native: boolean, reopen_on_backspace: boolean }
 ---@field files { command: string[]? } custom discovery command, run in the root
 ---@field keymaps { preset: boolean } opt-in buffer-local mappings in prompt buffers
----@field picker { backend: "auto"|"telescope"|"select" }
+---@field picker { on_trigger: boolean, keys: table<string, string[]> }
 ---@field return_to_prompt boolean `:q` in a file opened from the prompt returns to the prompt
 ---@field diagnostics { attachment_token_warning: integer, severity: table<string, "error"|"warn"|"info"|"hint"|false> }
 
@@ -53,9 +53,11 @@ M.defaults = {
   -- `:q` in the last window, showing a file opened from the prompt (e.g.
   -- with `gd`), returns to the prompt instead of exiting Neovim.
   return_to_prompt = true,
-  -- Full-size picker: "auto" uses telescope.nvim when installed, else
-  -- vim.ui.select (Enter only).
-  picker = { backend = "auto" },
+  -- The picker (`:Vergil pick`, `<C-g>` from inline completion).
+  -- on_trigger: typing `@` or `/` opens the picker instead of inline
+  -- completion. keys: override the picker's keys, e.g.
+  -- { next_tab = { "<C-l>" }, prev_tab = { "<C-h>" } }.
+  picker = { on_trigger = false, keys = {} },
   diagnostics = {
     -- Flag attachments above this many estimated tokens (bytes / 3). Agents
     -- may skip or cut large files; see "Observed behaviour" in the README.
@@ -95,10 +97,9 @@ function M.set(opts)
   vim.validate("keymaps", opts.keymaps, "table", true)
   vim.validate("return_to_prompt", opts.return_to_prompt, "boolean", true)
   vim.validate("picker", opts.picker, "table", true)
-  if opts.picker and opts.picker.backend ~= nil then
-    vim.validate("picker.backend", opts.picker.backend, function(v)
-      return v == "auto" or v == "telescope" or v == "select"
-    end, '"auto", "telescope" or "select"')
+  if opts.picker then
+    vim.validate("picker.on_trigger", opts.picker.on_trigger, "boolean", true)
+    vim.validate("picker.keys", opts.picker.keys, "table", true)
   end
   vim.validate("diagnostics", opts.diagnostics, "table", true)
   if opts.diagnostics then

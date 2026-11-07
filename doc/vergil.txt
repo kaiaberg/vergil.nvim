@@ -42,8 +42,8 @@ actions use Neovim's usual LSP mappings.
 2. SETUP                                                        *vergil-setup*
 
 Requirements: Neovim 0.11 or newer. Optional: Claude Code, to hand prompts
-over with `Ctrl+G`; a completion engine (blink.cmp, nvim-cmp, or built-in completion), telescope.nvim for
-|:Vergil-pick|, ripgrep, fd or git for file discovery, and a Nerd Font for
+over with `Ctrl+G`; a completion engine (blink.cmp, nvim-cmp, or built-in
+completion); ripgrep, fd or git for file discovery; and a Nerd Font for
 completion icons.
 
 Claude Code opens `$VISUAL` before `$EDITOR`, so set: >sh
@@ -132,6 +132,30 @@ Engine notes:
 - Built-in completion: set `completion.native = true` and add `popup` to
   'completeopt' to see skill descriptions. Leave it off with a completion
   plugin, or two menus open.
+
+                                                              *vergil-picker*
+The picker has tabs for everything that can go into a prompt: All, Files,
+Changed and Commits (in a git repository), and Skills. |:Vergil-pick| opens
+it on a tab; <C-g> (preset, Insert mode) opens it on what you're typing
+(`@sess`, `@@sess`, `/rev`) and replaces that with your choice. Type to
+filter; the query stays when switching tabs, and tabs cycle.
+
+  <CR>                      Insert the item, or every marked one
+  <Tab> <S-Tab>             Mark, unmark (across tabs)
+  <C-n> <C-p> <Down> <Up>   Move
+  <C-Right> <C-l> <M-l>     Next tab
+  <C-Left> <C-h> <M-h>      Previous tab
+  <M-1> .. <M-9>            Go to a tab (<C-1>.. where the terminal sends it)
+  <C-t>                     Switch between attaching and mentioning files
+  <C-r>                     Select lines of the file
+  <C-d>                     Insert a commit's diff
+  <C-f> <C-b>               Scroll the preview
+  <Esc> <C-c>               Close
+
+`picker.keys` overrides keys: `{ next_tab = { "<C-l>" } }` (names: confirm,
+close, down, up, mark, unmark, next_tab, prev_tab, scroll_down, scroll_up).
+`picker.on_trigger = true` opens the picker on `@` and `/` instead of the
+inline menu.
 
 ==============================================================================
 5. LINE SELECTION AND SNIPPETS                       *vergil-lines* *vergil-#*
@@ -292,12 +316,14 @@ prompt from before `Ctrl+G`, even if it was written in between.
 :Vergil toggle                                           *:Vergil-toggle*
     Convert the reference under the cursor between attachment and mention.
 
-:Vergil pick [attach|mention|skills|changed]               *:Vergil-pick*
-    Full-size picker. <CR> inserts, <C-t> switches between attachment and
-    mention, <C-r> selects lines, <Tab> marks several files to insert at
-    once. Uses telescope.nvim, else |vim.ui.select| (<CR> only).
+:Vergil pick [attach|mention|skills|changed|commits]       *:Vergil-pick*
+    Open |vergil-picker| on a tab: `all` (default), `attach` or `mention`
+    (Files, in that mode), `skills`, `changed`, `commits`.
     `changed` lists files changed in git (modified, staged, renamed,
-    untracked; not deleted) with their status, to attach.
+    untracked; not deleted) with their status, to attach. `commits` lists
+    recent commits that touched the root, with a `git show` preview, and
+    inserts `` `abc1234` (subject) ``; <C-d> inserts the commit's diff
+    instead. See |vergil-git|.
 
 :Vergil diff [staged|{rev}]                                *:Vergil-diff*
     Insert `git diff` below the cursor line as a fenced `diff` block,
@@ -305,7 +331,17 @@ prompt from before `Ctrl+G`, even if it was written in between.
     tracked files (`git diff HEAD`); `staged` only staged ones; {rev} a
     revision or range such as `HEAD~1` or `main...`. Only changes under the
     root are shown, with paths relative to it. Warns when the diff is above
-    `diagnostics.attachment_token_warning`.
+    `diagnostics.attachment_token_warning`. <Tab> completes `staged`,
+    branches, tags and recent commits.
+
+                                                                 *vergil-git*
+vergil turns git state into prompt text and doesn't browse history; git is
+optional. For history and diffs use vim-fugitive or diffview.nvim, for
+finding commits telescope's `git_commits` and `git_branches`, and for hunks
+gitsigns.nvim. blink-cmp-git completes commit hashes after `:` in prompt
+buffers if you add it to their sources (`vim.b.vergil_enabled`); its `@` and
+`#` GitHub/GitLab completions overlap vergil's triggers, so move them with
+its `git_centers.github.mention.triggers` and `issue.triggers` options.
 
 :Vergil submit                                           *:Vergil-submit*
     Write the prompt, settle other modified buffers, exit.
@@ -329,8 +365,10 @@ vergil maps nothing by default. Normal-mode <Plug> mappings:
   <Plug>(vergil-open)           <Plug>(vergil-open-split)
   <Plug>(vergil-open-vsplit)    <Plug>(vergil-open-tab)
   <Plug>(vergil-submit)         <Plug>(vergil-abort)
-  <Plug>(vergil-pick-attach)    <Plug>(vergil-pick-mention)
-  <Plug>(vergil-pick-skills)    <Plug>(vergil-send)
+  <Plug>(vergil-pick)           <Plug>(vergil-pick-attach)
+  <Plug>(vergil-pick-mention)   <Plug>(vergil-pick-skills)
+  <Plug>(vergil-pick-changed)   <Plug>(vergil-pick-commits)
+  <Plug>(vergil-pick-expand)    <Plug>(vergil-send)
   <Plug>(vergil-send-snippet)   <Plug>(vergil-send-both)
 
 The pick mappings also exist in Insert mode. The send mappings also exist in
@@ -348,6 +386,7 @@ Visual mode, where they send the selected lines.
   ZQ        |:Vergil-abort|
   <Esc>     Close an open preview, also when focused; a normal <Esc>
             otherwise
+  <C-g>     (Insert mode) Open the picker on what you're typing
 
 and, in Visual mode in other file buffers while a prompt is open, the line
 selector's keys (`selector.keys`):
@@ -376,7 +415,7 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
     files = { command = nil },
     keymaps = { preset = false },
     return_to_prompt = true,
-    picker = { backend = "auto" },
+    picker = { on_trigger = false, keys = {} },
     diagnostics = {
       attachment_token_warning = 20000,
       severity = {
@@ -410,7 +449,8 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
                         built-in scan.
 `keymaps.preset`        See |vergil-keymap-preset|.
 `return_to_prompt`      See |vergil-preview|.
-`picker.backend`        "auto", "telescope" or "select".
+`picker.on_trigger`     Open the picker on `@` and `/`. See |vergil-picker|.
+`picker.keys`           Override picker keys. See |vergil-picker|.
 `diagnostics.attachment_token_warning`
                         Estimated tokens (bytes / 3) above which an
                         attachment is flagged.

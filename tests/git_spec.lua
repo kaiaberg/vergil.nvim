@@ -34,6 +34,34 @@ local function text(bufnr)
   return vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 end
 
+local ui = require("vergil.ui.picker")
+ui.preview_min_width = 0
+
+local function feed(keys)
+  vim.api.nvim_feedkeys(vim.keycode(keys), "xt", false)
+end
+
+--- Opens the picker on a tab through the command and waits for it to load.
+local function open(kind)
+  feed(":Vergil pick " .. kind .. "<CR>")
+  vim.wait(2000, function()
+    local p = ui.current()
+    return p and p.tab_spec().items ~= nil
+  end)
+  return assert(ui.current(), "picker did not open")
+end
+
+local function shown()
+  return vim.api.nvim_buf_get_lines(ui.current().bufs.list, 0, -1, false)
+end
+
+--- A prompt in a fresh session rooted at `top`.
+local function prompt_in(top, lines, name)
+  ui.close()
+  vim.cmd("silent! %bwipeout!")
+  return h.prompt(top, lines, name)
+end
+
 local function contains(lines, line)
   return vim.tbl_contains(lines, line)
 end
@@ -62,68 +90,53 @@ return {
     local files, err = git.changed(plain)
     h.eq(files, nil)
     h.truthy(err:find("not a git repository", 1, true), err)
+    prompt_in(plain, { "" }, "git-plain")
+    local ok, perr = require("vergil.picker").pick("changed")
+    h.eq(ok, false)
+    h.truthy(perr:find("not a git repository", 1, true), perr)
+    open("all")
+    local names = vim.tbl_map(function(t) return t.name end, ui.current().opts.tabs)
+    h.eq(names, { "All", "Files", "Skills" }, "no git tabs outside a repository")
+    feed("<Esc>")
     local clean = h.tree({ ["x.lua"] = "x\n" })
     sh(clean, "init", "-q")
     sh(clean, "add", ".")
     sh(clean, "commit", "-q", "-m", "init")
     h.eq(git.changed(clean), {})
-    vim.cmd("silent! %bwipeout!")
-    h.prompt(clean, { "" }, "git-clean")
-    h.eq({ require("vergil.picker").pick("changed") }, { false, "no changed files" })
+    prompt_in(clean, { "" }, "git-clean")
+    open("changed")
+    h.eq(shown(), { "  Nothing here" })
+    feed("<Esc>")
   end,
   [":Vergil pick changed shows the status and attaches the choice"] = function()
     local top = repo()
-    vim.cmd("silent! %bwipeout!")
-    local b = h.prompt(top, { "Review" }, "git-pick")
+    local b = prompt_in(top, { "Review" }, "git-pick")
     vim.cmd("silent write") -- an untracked file in the repository now
-    require("vergil").setup({ root = top, picker = { backend = "select" } })
     vim.api.nvim_win_set_cursor(0, { 1, 5 })
-    local shown
-    local select = vim.ui.select
-    vim.ui.select = function(items, opts, on_choice)
-      shown = vim.tbl_map(opts.format_item, items)
-      on_choice(items[1])
-    end
-    local ok, err = require("vergil.picker").pick("changed")
-    vim.ui.select = select
-    h.eq({ ok, err }, { true, nil })
-    h.eq(shown[1], "a.lua  (modified)")
-    h.eq(shown[2], "c.lua  (added, staged)")
-    h.eq(vim.tbl_filter(function(s) return s:find("claude-prompt", 1, true) end, shown), {}, "not the prompt itself")
+    open("changed")
+    h.eq(ui.current().tab_spec().name, "Changed")
+    local list = shown()
+    h.truthy(list[1]:match("^  a%.lua%s+modified$"), list[1])
+    h.truthy(list[2]:match("^  c%.lua%s+added, staged$"), list[2])
+    h.eq(vim.tbl_filter(function(l) return l:find("claude-prompt", 1, true) end, list), {}, "not the prompt itself")
+    feed("<CR>")
     h.eq(text(b), { "Review @a.lua" })
-    require("vergil").setup({ root = top })
   end,
   ["several files at once are inserted space-separated"] = function()
     local top = repo()
-    vim.cmd("silent! %bwipeout!")
-    local b = h.prompt(top, { "Review" }, "git-many")
-    require("vergil").setup({ root = top, picker = { backend = "select" } })
+    local b = prompt_in(top, { "Review" }, "git-many")
     vim.api.nvim_win_set_cursor(0, { 1, 5 })
-    local backend = require("vergil.picker.select")
-    local pick_files = backend.pick_files
-    backend.pick_files = function(files, kind, api)
-      api.choose_many(kind, { files[1], files[4] })
-    end
-    require("vergil.picker").pick("changed")
-    backend.pick_files = pick_files
-    h.eq(text(b), { "Review @a.lua @sub/s.lua" })
-    require("vergil").setup({ root = top })
+    open("changed")
+    feed("<Tab><Down><Down><Tab><CR>")
+    h.eq(text(b), { "Review @a.lua @sub/s.lua" }) -- Tab marks and moves down
   end,
   ["inserting mid-line keeps words apart"] = function()
     local top = repo()
-    vim.cmd("silent! %bwipeout!")
-    local b = h.prompt(top, { "Review this" }, "git-mid")
-    require("vergil").setup({ root = top, picker = { backend = "select" } })
+    local b = prompt_in(top, { "Review this" }, "git-mid")
     vim.api.nvim_win_set_cursor(0, { 1, 0 })
-    local backend = require("vergil.picker.select")
-    local pick_files = backend.pick_files
-    backend.pick_files = function(files, kind, api)
-      api.choose_many(kind, { files[1], files[2] })
-    end
-    require("vergil.picker").pick("changed")
-    backend.pick_files = pick_files
+    open("changed")
+    feed("<Tab><Tab><CR>")
     h.eq(text(b), { "R @a.lua @c.lua eview this" })
-    require("vergil").setup({ root = top })
   end,
   [":Vergil diff inserts all uncommitted changes as a diff block"] = function()
     local top = repo()
@@ -179,5 +192,69 @@ return {
     vim.notify = notify
     h.eq(ok, true)
     h.truthy(warned and warned:find("large diff", 1, true), warned)
+  end,
+  ["commits that touched the root, as references"] = function()
+    local top = repo()
+    sh(top, "add", "-A")
+    sh(top, "commit", "-q", "-m", "Use `new` in a.lua")
+    local commits = assert(git.commits(top))
+    h.eq(vim.tbl_map(function(c) return c.subject end, commits), { "Use `new` in a.lua", "init" })
+    h.eq(commits[1].author, "t")
+    h.truthy(commits[1].hash:match("^%x+$") and #commits[1].hash >= 7, commits[1].hash)
+    h.eq(git.reference(commits[1]), ("`%s` (Use 'new' in a.lua)"):format(commits[1].hash))
+    h.eq(git.reference({ hash = "abc1234", subject = "" }), "`abc1234`")
+    vim.fn.writefile({ "x" }, top .. "/a.lua")
+    sh(top, "commit", "-q", "-am", "outside sub")
+    local sub = vim.tbl_map(function(c) return c.subject end, assert(git.commits(top .. "/sub")))
+    h.eq(sub, { "Use `new` in a.lua", "init" }, "only commits that touched the root")
+    h.truthy(table.concat(git.show(top, commits[1].hash), "\n"):find("+new", 1, true))
+  end,
+  [":Vergil pick commits inserts references; <C-d> inserts the diff"] = function()
+    local top = repo()
+    sh(top, "add", "-A")
+    sh(top, "commit", "-q", "-m", "Second")
+    local hash = git.commits(top)[1].hash
+    local b = prompt_in(top, { "See" }, "git-commits")
+    vim.api.nvim_win_set_cursor(0, { 1, 2 })
+    open("commits")
+    h.truthy(shown()[1]:match("^  " .. hash .. "  Second%s+t, "), shown()[1])
+    feed("<CR>")
+    h.eq(text(b), { ("See `%s` (Second)"):format(hash) })
+
+    vim.api.nvim_buf_set_lines(b, 0, -1, false, { "Both:" })
+    vim.api.nvim_win_set_cursor(0, { 1, 4 })
+    open("commits")
+    feed("<Tab><Tab><CR>")
+    h.truthy(text(b)[1]:match("^Both: `%x+` %(Second%) `%x+` %(init%)$"), text(b)[1])
+
+    vim.api.nvim_buf_set_lines(b, 0, -1, false, { "What changed?" })
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    open("commits")
+    feed("<C-d>")
+    local lines = text(b)
+    h.eq(lines[3], ("Output of `git diff %s^!`:"):format(hash))
+    h.truthy(contains(lines, "+new") and contains(lines, "+c"), vim.inspect(lines))
+  end,
+  [":Vergil diff completes staged, branches, tags and commits"] = function()
+    local top = repo()
+    sh(top, "tag", "v1")
+    local branch = vim.trim(sh(top, "branch", "--show-current"))
+    local hash = git.commits(top)[1].hash
+    vim.cmd("silent! %bwipeout!")
+    h.prompt(top, { "" }, "git-complete")
+    local all = require("vergil.commands").complete("", "Vergil diff ")
+    for _, want in ipairs({ "staged", branch, "v1", hash }) do
+      h.truthy(contains(all, want), want .. " missing: " .. vim.inspect(all))
+    end
+    h.eq(require("vergil.commands").complete("v", "Vergil diff v"), { "v1" })
+    h.truthy(contains(require("vergil.commands").complete("", "Vergil pick "), "commits"))
+  end,
+  ["a repository without commits"] = function()
+    local empty = h.tree({ ["x.lua"] = "" })
+    sh(empty, "init", "-q")
+    local commits, err = git.commits(empty)
+    h.eq(commits, nil)
+    h.truthy(err and err ~= "", err)
+    h.eq(git.revisions(empty), { "staged" })
   end,
 }

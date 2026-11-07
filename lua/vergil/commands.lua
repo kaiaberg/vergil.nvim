@@ -108,12 +108,14 @@ function M.complete(arglead, cmdline)
   if cmdline:match("^%s*%S+%s+pick%s+%S*$") then
     return vim.tbl_filter(function(n)
       return vim.startswith(n, arglead)
-    end, { "attach", "mention", "skills", "changed" })
+    end, require("vergil.picker").kinds)
   end
   if cmdline:match("^%s*%S+%s+diff%s+%S*$") then
+    local session = require("vergil.session")
+    local s = session.get(0)
     return vim.tbl_filter(function(n)
       return vim.startswith(n, arglead)
-    end, { "staged", "HEAD~1" })
+    end, require("vergil.git").revisions(s and s.root or session.root()))
   end
   if cmdline:match("^%s*%S+%s+send%s+%S*$") then
     return vim.tbl_filter(function(n)

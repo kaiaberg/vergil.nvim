@@ -239,6 +239,9 @@ function M.handle(params, session, respond)
   if parser.fenced_lines(lines)[row + 1] then
     return respond(EMPTY)
   end
+  if config.options.picker.on_trigger and not (params.context and params.context.triggerKind == INVOKED) then
+    return respond(EMPTY) -- the picker opens instead
+  end
   local token = M.typing_token(line, col)
   if params.context and params.context.triggerKind == INVOKED then
     token = M.existing_token(bufnr, row, col, session.root) or token

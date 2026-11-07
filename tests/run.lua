@@ -1,4 +1,5 @@
 -- Minimal test runner: nvim -n --clean -l tests/run.lua [file ...]
+-- VERGIL_TEST=<Lua pattern> runs only the tests whose names match.
 -- Dependency-free on purpose (plan §2). Each spec file returns a table of
 -- name -> function; a test fails if it errors.
 local root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
@@ -11,6 +12,10 @@ for _, file in ipairs(files) do
   local specs = dofile(file)
   local names = vim.tbl_keys(specs)
   table.sort(names)
+  local only = vim.env.VERGIL_TEST
+  if only and only ~= "" then
+    names = vim.tbl_filter(function(n) return n:find(only) ~= nil end, names)
+  end
   for _, name in ipairs(names) do
     local ok, err = pcall(specs[name])
     if ok then

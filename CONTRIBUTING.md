@@ -3,7 +3,7 @@
 ## Conventions
 
 - **Neovim:** minimum 0.11, tested on 0.11.7 and 0.12.6 (see `docs/m0-findings.md`). Use `vim.uv`, not `vim.loop`.
-- **Dependencies:** the core depends on nothing but Neovim. Pickers and completion engines are optional adapters.
+- **Dependencies:** the core depends on nothing but Neovim. Completion engines are optional; the picker is built in.
 - **Layout:** follow the plan's repository layout, and add modules only when they are implemented.
 - **Agent isolation:** nothing outside `lua/vergil/adapters/claude/` may mention `.claude` or Claude's syntax.
 - **Non-destructive:** edits replace exact parser spans only, and never trim or reformat prompt text.

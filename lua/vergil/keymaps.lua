@@ -3,7 +3,7 @@
 --- unless asked (plan §2, principle 7).
 local M = {}
 
----@type { lhs: string, plug: string, desc: string }[]
+---@type { lhs: string, plug: string, desc: string, mode: string? }[]
 M.preset = {
   { lhs = "gs", plug = "<Plug>(vergil-snippet)", desc = "Replace reference with its lines" },
   { lhs = "gb", plug = "<Plug>(vergil-snippet-both)", desc = "Add the reference's lines below" },
@@ -13,6 +13,7 @@ M.preset = {
   { lhs = "<C-w>gf", plug = "<Plug>(vergil-open-tab)", desc = "Open the reference in a tab, or <C-w>gf" },
   { lhs = "ZZ", plug = "<Plug>(vergil-submit)", desc = "Submit the prompt" },
   { lhs = "ZQ", plug = "<Plug>(vergil-abort)", desc = "Abort: restore the prompt from before Ctrl+G" },
+  { lhs = "<C-g>", plug = "<Plug>(vergil-pick-expand)", desc = "Open the picker on what you're typing", mode = "i" },
 }
 
 local group = vim.api.nvim_create_augroup("vergil.keymaps", { clear = true })
@@ -90,9 +91,6 @@ function M.define_plugs()
     ["open-tab"] = { act(function() return vergil().open("tab") end, "<C-w>gf"), "open the reference in a tab" },
     ["submit"] = { act(function() return require("vergil.submit").submit() end), "submit the prompt" },
     ["abort"] = { act(function() return require("vergil.submit").abort() end), "abort and restore the prompt" },
-    ["pick-attach"] = { act(function() return require("vergil.picker").pick("attach") end), "pick a file to attach" },
-    ["pick-mention"] = { act(function() return require("vergil.picker").pick("mention") end), "pick a file to mention" },
-    ["pick-skills"] = { act(function() return require("vergil.picker").pick("skills") end), "pick a skill" },
     ["close-preview"] = {
       function()
         if not M.close_preview() then
@@ -117,14 +115,21 @@ function M.define_plugs()
       end
     end, { desc = "vergil: send lines to the prompt (" .. action .. ")" })
   end
-  for _, kind in ipairs({ "attach", "mention", "skills" }) do
-    vim.keymap.set("i", ("<Plug>(vergil-pick-%s)"):format(kind), function()
+  for _, kind in ipairs(require("vergil.picker").kinds) do
+    local lhs = kind == "all" and "<Plug>(vergil-pick)" or ("<Plug>(vergil-pick-%s)"):format(kind)
+    vim.keymap.set({ "n", "i" }, lhs, function()
       local ok, err = require("vergil.picker").pick(kind)
       if not ok then
         notify(err)
       end
     end, { desc = "vergil: pick (" .. kind .. ")" })
   end
+  vim.keymap.set({ "n", "i" }, "<Plug>(vergil-pick-expand)", function()
+    local ok, err = require("vergil.picker").expand()
+    if not ok then
+      notify(err)
+    end
+  end, { desc = "vergil: open the picker on what you're typing" })
 end
 
 --- In a focused preview float (after pressing `K` twice), Neovim maps only
@@ -190,7 +195,7 @@ function M.attach(bufnr)
     return
   end
   for _, m in ipairs(M.preset) do
-    vim.keymap.set("n", m.lhs, m.plug, { buffer = bufnr, remap = true, desc = "vergil: " .. m.desc })
+    vim.keymap.set(m.mode or "n", m.lhs, m.plug, { buffer = bufnr, remap = true, desc = "vergil: " .. m.desc })
   end
   M.watch_sources()
   vim.api.nvim_create_autocmd("WinEnter", {
@@ -210,14 +215,18 @@ function M.detach(bufnr)
   if not vim.api.nvim_buf_is_valid(bufnr) then
     return
   end
-  local ours = {}
-  for _, m in ipairs(M.preset) do
-    ours[m.lhs] = m.plug
-  end
   -- Only delete mappings vergil made; leave a user's own buffer mappings.
-  for _, map in ipairs(vim.api.nvim_buf_get_keymap(bufnr, "n")) do
-    if ours[map.lhs] and map.rhs == ours[map.lhs] then
-      vim.keymap.del("n", map.lhs, { buffer = bufnr })
+  for _, mode in ipairs({ "n", "i" }) do
+    local ours = {}
+    for _, m in ipairs(M.preset) do
+      if (m.mode or "n") == mode then
+        ours[vim.keycode(m.lhs)] = m.plug
+      end
+    end
+    for _, map in ipairs(vim.api.nvim_buf_get_keymap(bufnr, mode)) do
+      if ours[vim.keycode(map.lhs)] and map.rhs == ours[vim.keycode(map.lhs)] then
+        vim.keymap.del(mode, map.lhs, { buffer = bufnr })
+      end
     end
   end
   for _, au in ipairs(vim.api.nvim_get_autocmds({ group = group, event = "WinEnter" })) do

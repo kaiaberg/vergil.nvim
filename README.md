@@ -23,6 +23,8 @@ holds the conversation.
 - [Quick tour](#quick-tour)
 - [Attach or mention?](#attach-or-mention)
 - [Writing prompts ahead of time](#writing-prompts-ahead-of-time)
+- [The picker](#the-picker)
+- [Git](#git)
 - [Completion setup](#completion-setup)
 - [Commands](#commands)
 - [Mappings](#mappings)
@@ -41,9 +43,6 @@ holds the conversation.
 - Optional: a completion engine. [blink.cmp](https://github.com/Saghen/blink.cmp)
   and [nvim-cmp](https://github.com/hrsh7th/nvim-cmp) both work, and so does
   Neovim's built-in LSP completion (`completion.native = true`).
-- Optional: [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim)
-  for the full-size picker (`:Vergil pick`). Without it, vergil falls back to
-  `vim.ui.select`.
 - Optional: [ripgrep](https://github.com/BurntSushi/ripgrep), `fd` or `git` for
   fast file discovery that respects `.gitignore`.
 - Optional: a [Nerd Font](https://www.nerdfonts.com/) for completion icons,
@@ -134,6 +133,10 @@ if (!token) {
 ```
 ````
 
+**Need more room? `<C-g>`** (with the preset) turns what you're typing into
+the full [picker](#the-picker): `@sess` opens the Files tab searching for
+`sess`, with a preview, and the other tabs one key away.
+
 **`/` completes skills and commands**, from your project, your personal
 `~/.claude` and enabled plugins, with descriptions and argument hints.
 Accepting inserts the command; whether it runs is up to Claude Code.
@@ -151,7 +154,8 @@ you're back in the prompt. `<C-^>` returns to the file for more.
 **Review what you changed.** `:Vergil pick changed` lists files changed in
 git with their status; mark several with `<Tab>` to attach them at once.
 `:Vergil diff` inserts the uncommitted changes as a `diff` block (`staged`, or
-a revision like `HEAD~1`, for others).
+a revision like `HEAD~1`, for others). `:Vergil pick commits` inserts commits
+as `` `abc1234` (Fix token refresh) ``. See [Git](#git).
 
 **Fix what vergil flags.** Diagnostics point out files attached twice,
 large attachments, line ranges past the end of a file or out of step with
@@ -197,6 +201,91 @@ require("vergil").setup({
 
 Paths are relative to the project root, which is the directory Neovim started
 in. Start Neovim in the project the prompt is for, or set `root`.
+
+## The picker
+
+One picker for everything that can go into a prompt, with tabs:
+
+| # | Tab | Inserts |
+|---|---|---|
+| 1 | All | everything below, with its kind on the right |
+| 2 | Files | `@path`, or `` `path` `` after `<C-t>` |
+| 3 | Changed | files changed in git, with their status (only in a repository) |
+| 4 | Commits | `` `abc1234` (subject) ``; `<C-d>` inserts its diff (only in a repository) |
+| 5 | Skills | `/name` |
+
+Open it with `:Vergil pick [tab]` (`all`, `attach`, `mention`, `changed`,
+`commits`, `skills`; default All), or press `<C-g>` (preset) while typing
+`@sess`, `@@sess` or `/rev`: it opens on the matching tab with what you typed,
+and replaces it with your choice. Type to filter; the query stays when you
+switch tabs.
+
+| Key | Does |
+|---|---|
+| `Enter` | insert the item, or every marked one |
+| `<Tab>` / `<S-Tab>` | mark / unmark, across tabs |
+| `<C-n>` `<C-p>` `<Down>` `<Up>` | move |
+| `<C-Right>` `<C-l>` `<M-l>` / `<C-Left>` `<C-h>` `<M-h>` | next / previous tab (cycles) |
+| `<M-1>`…`<M-9>` | go to a tab (`<C-1>`… where the terminal sends them) |
+| `<C-t>` | switch between attaching and mentioning files |
+| `<C-r>` | select lines of the file |
+| `<C-d>` | insert a commit's diff |
+| `<C-f>` / `<C-b>` | scroll the preview |
+| `Esc` | close |
+
+`<M-…>` keys need your terminal to send Option as Meta (iTerm2: Profiles →
+Keys). Change any of them with `picker.keys`, e.g.
+`picker = { keys = { next_tab = { "<C-l>" } } }`.
+
+`picker.on_trigger = true` opens the picker as soon as you type `@` or `/`
+where a reference can start, instead of the inline menu.
+
+## Git
+
+vergil turns git state into prompt text; it doesn't browse history. Git is
+optional, and every command says so when there's no repository.
+
+| You want | Use |
+|---|---|
+| Attach the files you changed | `:Vergil pick changed` (`<Tab>` marks several) |
+| Show the agent your changes | `:Vergil diff` (all uncommitted), `:Vergil diff staged`, `:Vergil diff main...` |
+| Point at a commit | `:Vergil pick commits`: inserts `` `abc1234` (subject) ``; the agent can `git show` it |
+| Show a commit's changes | `<C-d>` in `:Vergil pick commits`, or `:Vergil diff abc1234^!` |
+
+`:Vergil diff <Tab>` completes `staged`, branches, tags and recent commits.
+Commits, diffs and changed files are limited to the root, with paths relative
+to it.
+
+For everything else, use the plugins built for it:
+
+- **Browsing history and diffs:** [vim-fugitive](https://github.com/tpope/vim-fugitive)
+  (`:Git log`, `:Gclog`, `:Gdiffsplit`, `:Git blame`) or
+  [diffview.nvim](https://github.com/sindrets/diffview.nvim).
+- **Finding commits and branches:** telescope's `git_commits`, `git_bcommits`
+  and `git_branches` pickers.
+- **Hunks and blame in a file:** [gitsigns.nvim](https://github.com/lewis6991/gitsigns.nvim).
+- **Commit hashes while typing:** [blink-cmp-git](https://github.com/Kaiser-Yang/blink-cmp-git)
+  completes commits after `:` (plain git is enough). Add it to the prompt
+  buffer's sources:
+
+  ```lua
+  sources = {
+    default = function()
+      if vim.b.vergil_enabled then
+        return { "lsp", "git" }
+      end
+      return { "lsp", "path", "snippets", "buffer" }
+    end,
+    providers = {
+      git = { module = "blink-cmp-git", name = "Git" },
+    },
+  },
+  ```
+
+  Its GitHub and GitLab completions use `@` (users) and `#` (issues and pull
+  requests), which are vergil's triggers too. If you use them, move them with
+  its `git_centers.github.mention.triggers`, `issue.triggers` and
+  `pull_request.triggers` options (the same under `gitlab`).
 
 ## Completion setup
 
@@ -253,7 +342,7 @@ will open.
 | `:Vergil snippet [both]` | Replace a ranged reference with its lines (`both`: keep it, add the lines below) |
 | `:Vergil send [snippet\|both]` | Send the cursor line, or a range (`:'<,'>`), of the current file to the prompt as a mention, snippet or both |
 | `:Vergil toggle` | Convert between attachment and mention |
-| `:Vergil pick [attach\|mention\|skills\|changed]` | Full-size picker: `Enter` inserts, `<C-t>` switches type, `<C-r>` selects lines, `<Tab>` marks several; `changed` lists files changed in git |
+| `:Vergil pick [all\|attach\|mention\|skills\|changed\|commits]` | Open [the picker](#the-picker) on that tab (default All) |
 | `:Vergil diff [staged\|<rev>]` | Insert `git diff` (default: all uncommitted changes) as a fenced `diff` block |
 | `:Vergil submit` | Write the prompt, settle other modified buffers, exit |
 | `:Vergil abort` | Restore the previous prompt and exit |
@@ -270,8 +359,10 @@ vergil maps nothing unless you ask. Every action has a `<Plug>` mapping:
 `<Plug>(vergil-toggle)`, `<Plug>(vergil-preview)`, `<Plug>(vergil-open)`,
 `<Plug>(vergil-open-split)`, `<Plug>(vergil-open-vsplit)`,
 `<Plug>(vergil-open-tab)`, `<Plug>(vergil-submit)`, `<Plug>(vergil-abort)`,
-`<Plug>(vergil-pick-attach)`, `<Plug>(vergil-pick-mention)`,
-`<Plug>(vergil-pick-skills)`, `<Plug>(vergil-close-preview)`, and
+`<Plug>(vergil-pick)`, `<Plug>(vergil-pick-attach)`, `<Plug>(vergil-pick-mention)`,
+`<Plug>(vergil-pick-skills)`, `<Plug>(vergil-pick-changed)`,
+`<Plug>(vergil-pick-commits)`, `<Plug>(vergil-pick-expand)` (these also in
+Insert mode), `<Plug>(vergil-close-preview)`, and
 `<Plug>(vergil-send)`, `<Plug>(vergil-send-snippet)` and
 `<Plug>(vergil-send-both)` (Normal and Visual mode).
 
@@ -280,6 +371,7 @@ vergil maps nothing unless you ask. Every action has a `<Plug>` mapping:
 | Key | Action |
 |---|---|
 | `gs` / `gb` | Snippet from a ranged reference: replace it / keep it and add the lines below |
+| `<C-g>` (Insert mode) | Open the picker on what you're typing |
 | `gf` / `<C-w>f` / `<C-w>gf` | Open the reference here / in a split / in a tab; the native key elsewhere |
 | `ZZ` / `ZQ` | `:Vergil submit` / `:Vergil abort` |
 | `<Esc>` | Close an open preview (also inside it); a normal `<Esc>` otherwise |
@@ -308,7 +400,10 @@ require("vergil").setup({
   files = { command = nil }, -- custom discovery command run in the root, e.g. { "fd", "-t", "f" }
   keymaps = { preset = false },
   return_to_prompt = true, -- :q in a file opened from the prompt returns to the prompt
-  picker = { backend = "auto" }, -- "telescope" or "select"
+  picker = {
+    on_trigger = false, -- open the picker on @ and / instead of inline completion
+    keys = {}, -- e.g. { next_tab = { "<C-l>" }, prev_tab = { "<C-h>" } }
+  },
   diagnostics = {
     attachment_token_warning = 20000, -- estimated as bytes / 3
     severity = { -- "error", "warn", "info", "hint", or false
