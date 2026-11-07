@@ -152,6 +152,10 @@ function M.parse(lines, opts)
           local ref = mention_from(span, row, span.content, opts.mention_format)
           if ref then
             ref.text = line:sub(span.start, span.finish)
+            -- `feature/login` (branch): a git branch, not a file.
+            if line:sub(span.finish + 1, span.finish + 9) == " (branch)" then
+              ref.git, ref.explicit = "branch", false
+            end
             refs[#refs + 1] = ref
             ranged = ref.start_line and ref or nil
           end

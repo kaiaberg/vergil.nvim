@@ -18,6 +18,16 @@ All notable changes are documented here. The format follows
   inserts. `<C-o>` joins them with spaces, commas, or one per line.
 - `picker.keys` customizes every picker key, including `<C-t>`, `<C-o>`,
   `<C-r>` and `<C-d>`.
+- `picker.tabs` chooses the picker's tabs and their order; a tab left out is
+  gone from All too.
+- A Branches tab: local and remote branches, the checked-out one first,
+  inserted as `` `feature/login` (branch) ``; `<C-d>` inserts the changes since
+  the branch split off.
+- `K` and `gd` on commits and branches in the prompt: `K` shows the message
+  and changed files, or recent commits and ahead/behind; `gd` and
+  `:Vergil open` show `git show` or the branch's log in a read-only buffer.
+- `preview.on_repeat`: `K` (now in the preset) or `:Vergil preview` again
+  closes the preview (default) or moves into it (`"focus"`).
 - `<C-g>` (preset, Insert mode) and `<Plug>(vergil-pick-expand)` turn the
   `@`, `@@` or `/` completion being typed into the picker, keeping the query.
 - `picker.on_trigger` opens the picker on `@` and `/` instead of inline

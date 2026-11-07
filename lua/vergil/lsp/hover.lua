@@ -70,7 +70,7 @@ function M.contents(ref, root)
     return { ("**%s**"):format(ref.path), "", "Resource reference; vergil doesn't resolve these." }
   end
   local target = resolver.resolve(ref, root)
-  if not target or not M.is_file_ref(ref, target) then
+  if ref.git or not target or not M.is_file_ref(ref, target) then
     return nil
   end
   local name = target.rel or target.abs
@@ -174,8 +174,12 @@ function M.handle(params, session)
     return M.skill_hover(session, row, col)
   end
   local contents = M.contents(ref, session.root)
-  if not contents then
-    return nil
+  if not contents or ref.git then
+    local obj = require("vergil.git").object_at(session, row, col)
+    if not obj then
+      return nil
+    end
+    contents = require("vergil.git").object_hover(session.root, obj)
   end
   local s = ref.span
   return {

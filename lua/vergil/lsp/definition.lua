@@ -21,7 +21,7 @@ function M.target_at(bufnr, row, col, root)
     return nil, "resource references can't be opened"
   end
   local target = resolver.resolve(ref, root)
-  if not target or not hover.is_file_ref(ref, target) then
+  if ref.git or not target or not hover.is_file_ref(ref, target) then
     return nil, "no reference under the cursor"
   end
   if not target.exists then
@@ -36,9 +36,16 @@ function M.handle(params, session)
   local row, col = params.position.line, params.position.character
   local t = M.target_at(session.bufnr, row, col, session.root)
   if not t then
+    local top = { start = { line = 0, character = 0 }, ["end"] = { line = 0, character = 0 } }
     local _, skill = hover.skill_at(session, row, col)
     if skill and skill.path then
-      return { uri = vim.uri_from_fname(skill.path), range = { start = { line = 0, character = 0 }, ["end"] = { line = 0, character = 0 } } }
+      return { uri = vim.uri_from_fname(skill.path), range = top }
+    end
+    local git = require("vergil.git")
+    local obj = git.object_at(session, row, col)
+    if obj then
+      local _, uri = git.object_buffer(session.root, obj)
+      return { uri = uri, range = top }
     end
     return nil
   end

@@ -16,7 +16,8 @@ local M = {}
 ---@field completion { native: boolean, reopen_on_backspace: boolean }
 ---@field files { command: string[]? } custom discovery command, run in the root
 ---@field keymaps { preset: boolean } opt-in buffer-local mappings in prompt buffers
----@field picker { on_trigger: boolean, keys: table<string, string[]> }
+---@field picker { on_trigger: boolean, keys: table<string, string[]>, tabs: string[] }
+---@field preview { on_repeat: "close"|"focus" }
 ---@field return_to_prompt boolean `:q` in a file opened from the prompt returns to the prompt
 ---@field diagnostics { attachment_token_warning: integer, severity: table<string, "error"|"warn"|"info"|"hint"|false> }
 
@@ -57,7 +58,16 @@ M.defaults = {
   -- on_trigger: typing `@` or `/` opens the picker instead of inline
   -- completion. keys: override the picker's keys, e.g.
   -- { next_tab = { "<C-l>" }, prev_tab = { "<C-h>" } }.
-  picker = { on_trigger = false, keys = {} },
+  -- tabs: which tabs the picker has, in this order; leave one out to drop it
+  -- (from All too).
+  picker = {
+    on_trigger = false,
+    keys = {},
+    tabs = { "all", "files", "changed", "branches", "commits", "skills" },
+  },
+  -- `K` (preset) or `:Vergil preview` while the preview is open: "close" it,
+  -- or "focus" it (move into it, as Neovim's own `K` does).
+  preview = { on_repeat = "close" },
   diagnostics = {
     -- Flag attachments above this many estimated tokens (bytes / 3). Agents
     -- may skip or cut large files; see "Observed behaviour" in the README.
@@ -100,6 +110,26 @@ function M.set(opts)
   if opts.picker then
     vim.validate("picker.on_trigger", opts.picker.on_trigger, "boolean", true)
     vim.validate("picker.keys", opts.picker.keys, "table", true)
+    vim.validate("picker.tabs", opts.picker.tabs, "table", true)
+    local known = { all = true, files = true, changed = true, branches = true, commits = true, skills = true }
+    local seen = {}
+    for _, name in ipairs(opts.picker.tabs or {}) do
+      if not known[name] then
+        error(("vergil: unknown picker tab %q; expected all, files, changed, branches, commits or skills"):format(tostring(name)), 0)
+      elseif seen[name] then
+        error(("vergil: picker tab %q is listed twice"):format(name), 0)
+      end
+      seen[name] = true
+    end
+    if opts.picker.tabs and #opts.picker.tabs == 0 then
+      error("vergil: picker.tabs needs at least one tab", 0)
+    end
+  end
+  vim.validate("preview", opts.preview, "table", true)
+  if opts.preview and opts.preview.on_repeat ~= nil then
+    vim.validate("preview.on_repeat", opts.preview.on_repeat, function(v)
+      return v == "close" or v == "focus"
+    end, '"close" or "focus"')
   end
   vim.validate("diagnostics", opts.diagnostics, "table", true)
   if opts.diagnostics then

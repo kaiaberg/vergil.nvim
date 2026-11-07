@@ -211,11 +211,19 @@ One picker for everything that can go into a prompt, with tabs:
 | 1 | All | everything below, with its kind on the right |
 | 2 | Files | `@path`, or `` `path` `` after `<C-t>` |
 | 3 | Changed | files changed in git, with their status (only in a repository) |
-| 4 | Commits | `` `abc1234` (subject) ``; `<C-d>` inserts its diff (only in a repository) |
-| 5 | Skills | `/name` |
+| 4 | Branches | `` `feature/login` (branch) ``; `<C-d>` inserts its changes since it split off (only in a repository) |
+| 5 | Commits | `` `abc1234` (subject) ``; `<C-d>` inserts its diff (only in a repository) |
+| 6 | Skills | `/name` |
+
+Choose the tabs and their order with `picker.tabs`; a tab left out is gone
+from All too:
+
+```lua
+picker = { tabs = { "all", "files", "changed", "skills" } } -- no branches or commits
+```
 
 Open it with `:Vergil pick [tab]` (`all`, `attach`, `mention`, `changed`,
-`commits`, `skills`; default All), or press `<C-g>` (preset) while typing
+`branches`, `commits`, `skills`; default All, or the first tab), or press `<C-g>` (preset) while typing
 `@sess`, `@@sess` or `/rev`: it opens on the matching tab with what you typed,
 and replaces it with your choice. Type to filter; the query stays when you
 switch tabs.
@@ -235,7 +243,7 @@ switch tabs.
 | `Esc` | close |
 
 Marked items show a sign: `@` a file to attach, `` ` `` a file to mention,
-`/` a skill, `◆` a commit. Each mark keeps the attach/mention mode it was
+`/` a skill, `◆` a commit, `⎇` a branch. Each mark keeps the attach/mention mode it was
 marked with, so you can mark some files to attach and others to mention. The
 **Marked** panel under the preview lists them in order, with the exact text
 each will insert.
@@ -261,6 +269,14 @@ optional, and every command says so when there's no repository.
 | Show the agent your changes | `:Vergil diff` (all uncommitted), `:Vergil diff staged`, `:Vergil diff main...` |
 | Point at a commit | `:Vergil pick commits`: inserts `` `abc1234` (subject) ``; the agent can `git show` it |
 | Show a commit's changes | `<C-d>` in `:Vergil pick commits`, or `:Vergil diff abc1234^!` |
+| Point at a branch | `:Vergil pick branches`: inserts `` `feature/login` (branch) ``; `<C-d>` inserts what it changed since it split off |
+
+`K` on a commit or branch in the prompt (`` `abc1234` ``, `` `main` ``,
+`` `feature/login` (branch) ``) shows its message and changed files, or its
+recent commits and how far it's ahead or behind. `gd` opens the whole commit
+(`git show`) or the branch's log in a read-only buffer; `:q` returns to the
+prompt. vergil only asks git when you press the key, and never flags these
+words as missing files.
 
 `:Vergil diff <Tab>` completes `staged`, branches, tags and recent commits.
 Commits, diffs and changed files are limited to the root, with paths relative
@@ -371,8 +387,9 @@ vergil maps nothing unless you ask. Every action has a `<Plug>` mapping:
 `<Plug>(vergil-open-tab)`, `<Plug>(vergil-submit)`, `<Plug>(vergil-abort)`,
 `<Plug>(vergil-pick)`, `<Plug>(vergil-pick-attach)`, `<Plug>(vergil-pick-mention)`,
 `<Plug>(vergil-pick-skills)`, `<Plug>(vergil-pick-changed)`,
-`<Plug>(vergil-pick-commits)`, `<Plug>(vergil-pick-expand)` (these also in
-Insert mode), `<Plug>(vergil-close-preview)`, and
+`<Plug>(vergil-pick-branches)`, `<Plug>(vergil-pick-commits)`,
+`<Plug>(vergil-pick-expand)` (these also in Insert mode),
+`<Plug>(vergil-hover)`, `<Plug>(vergil-close-preview)`, and
 `<Plug>(vergil-send)`, `<Plug>(vergil-send-snippet)` and
 `<Plug>(vergil-send-both)` (Normal and Visual mode).
 
@@ -380,6 +397,7 @@ Insert mode), `<Plug>(vergil-close-preview)`, and
 
 | Key | Action |
 |---|---|
+| `K` | Preview; pressed again, closes it (`preview.on_repeat = "focus"` moves into it instead, as Neovim's own `K` does) |
 | `gs` / `gb` | Snippet from a ranged reference: replace it / keep it and add the lines below |
 | `<C-g>` (Insert mode) | Open the picker on what you're typing |
 | `gf` / `<C-w>f` / `<C-w>gf` | Open the reference here / in a split / in a tab; the native key elsewhere |
@@ -413,7 +431,9 @@ require("vergil").setup({
   picker = {
     on_trigger = false, -- open the picker on @ and / instead of inline completion
     keys = {}, -- e.g. { next_tab = { "<C-l>" }, prev_tab = { "<C-h>" } }
+    tabs = { "all", "files", "changed", "branches", "commits", "skills" }, -- order; leave out to drop
   },
+  preview = { on_repeat = "close" }, -- K (preset) again: "close" the preview, or "focus" it
   diagnostics = {
     attachment_token_warning = 20000, -- estimated as bytes / 3
     severity = { -- "error", "warn", "info", "hint", or false

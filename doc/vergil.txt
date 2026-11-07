@@ -135,7 +135,9 @@ Engine notes:
 
                                                               *vergil-picker*
 The picker has tabs for everything that can go into a prompt: All, Files,
-Changed and Commits (in a git repository), and Skills. |:Vergil-pick| opens
+Changed, Branches and Commits (in a git repository), and Skills;
+`picker.tabs` sets which and in what order (a tab left out is gone from All
+too). Branches insert `` `name` (branch) ``. |:Vergil-pick| opens
 it on a tab; <C-g> (preset, Insert mode) opens it on what you're typing
 (`@sess`, `@@sess`, `/rev`) and replaces that with your choice. Type to
 filter; the query stays when switching tabs, and tabs cycle.
@@ -155,7 +157,8 @@ filter; the query stays when switching tabs, and tabs cycle.
   <C-f> <C-b>               Scroll the preview
   <Esc> <C-c>               Close
 
-Marked items show a sign: `@` attach, `` ` `` mention, `/` skill, `◆` commit.
+Marked items show a sign: `@` attach, `` ` `` mention, `/` skill, `◆` commit,
+`⎇` branch.
 A mark keeps the attach/mention mode it was marked with. The Marked panel
 under the preview lists the marks in order, with the text each inserts.
 
@@ -351,6 +354,14 @@ buffers if you add it to their sources (`vim.b.vergil_enabled`); its `@` and
 `#` GitHub/GitLab completions overlap vergil's triggers, so move them with
 its `git_centers.github.mention.triggers` and `issue.triggers` options.
 
+                                                         *vergil-git-objects*
+`K` on a commit or branch in the prompt (`` `abc1234` ``, `` `main` ``,
+`` `feature/x` (branch) ``) shows its message and changed files, or its recent
+commits and ahead/behind. `gd` and |:Vergil-open| show the whole commit
+(`git show`) or the branch's log in a read-only `vergil://git/...` buffer.
+vergil asks git only on these keys, and doesn't flag the words as missing
+files.
+
 :Vergil submit                                           *:Vergil-submit*
     Write the prompt, settle other modified buffers, exit.
 
@@ -376,6 +387,7 @@ vergil maps nothing by default. Normal-mode <Plug> mappings:
   <Plug>(vergil-pick)           <Plug>(vergil-pick-attach)
   <Plug>(vergil-pick-mention)   <Plug>(vergil-pick-skills)
   <Plug>(vergil-pick-changed)   <Plug>(vergil-pick-commits)
+  <Plug>(vergil-pick-branches)  <Plug>(vergil-hover)
   <Plug>(vergil-pick-expand)    <Plug>(vergil-send)
   <Plug>(vergil-send-snippet)   <Plug>(vergil-send-both)
 
@@ -385,6 +397,8 @@ Visual mode, where they send the selected lines.
                                                         *vergil-keymap-preset*
 `keymaps = { preset = true }` maps, in prompt buffers only:
 
+  K         Preview (LSP hover); pressed again, closes it, or moves into it
+            with `preview.on_repeat = "focus"` (Neovim's own behaviour)
   gs        Replace a ranged reference with its lines
   gb        Keep it and add its lines below
   gf        Open the reference; the native |gf| elsewhere
@@ -423,7 +437,11 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
     files = { command = nil },
     keymaps = { preset = false },
     return_to_prompt = true,
-    picker = { on_trigger = false, keys = {} },
+    picker = {
+      on_trigger = false, keys = {},
+      tabs = { "all", "files", "changed", "branches", "commits", "skills" },
+    },
+    preview = { on_repeat = "close" },
     diagnostics = {
       attachment_token_warning = 20000,
       severity = {
@@ -459,6 +477,9 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
 `return_to_prompt`      See |vergil-preview|.
 `picker.on_trigger`     Open the picker on `@` and `/`. See |vergil-picker|.
 `picker.keys`           Override picker keys. See |vergil-picker|.
+`picker.tabs`           The picker's tabs, in order. See |vergil-picker|.
+`preview.on_repeat`     `K` (preset) or |:Vergil-preview| with the preview
+                        open: "close" it (default) or "focus" it.
 `diagnostics.attachment_token_warning`
                         Estimated tokens (bytes / 3) above which an
                         attachment is flagged.

@@ -15,7 +15,7 @@ local M = {}
 
 --- `:Vergil pick` arguments: a tab, or `attach`/`mention` for Files in that
 --- mode.
-M.kinds = { "all", "attach", "mention", "skills", "changed", "commits" }
+M.kinds = { "all", "attach", "mention", "skills", "changed", "branches", "commits" }
 
 --- Keys for vergil's own picker actions; `picker.keys` overrides them, like
 --- the generic ones in `vergil.ui.picker`.
@@ -33,7 +33,10 @@ M.separators = {
   { key = "lines", sep = "\n", label = "one per line" },
 }
 
-local TAB_FOR = { all = "all", attach = "files", mention = "files", files = "files", skills = "skills", changed = "changed", commits = "commits" }
+local TAB_FOR = {
+  all = "all", attach = "files", mention = "files", files = "files", skills = "skills",
+  changed = "changed", branches = "branches", commits = "commits",
+}
 
 ---@class vergil.PickContext
 ---@field bufnr integer
@@ -87,6 +90,8 @@ function M.text_for(kind, value)
     return config.options.triggers.skills .. value.name .. " "
   elseif kind == "commits" then
     return require("vergil.git").reference(value)
+  elseif kind == "branches" then
+    return require("vergil.git").branch_reference(value)
   elseif kind == "mention" then
     return formatter.mention(value, nil, nil, config.options.mention.format)
   end
@@ -116,13 +121,17 @@ local function self_filter(bufnr, root)
   end
 end
 
---- Builds the tabs for a session.
+--- Builds the tabs for a session, in `picker.tabs` order.
 ---@return vergil.PickerTab[] tabs
 ---@return string? git_err why the git tabs are missing
 local function build_tabs(session)
   local root = session.root
   local keep = self_filter(session.bufnr, root)
   local git = require("vergil.git")
+  local enabled = {}
+  for _, name in ipairs(config.options.picker.tabs) do
+    enabled[name] = true
+  end
   local changed, git_err = git.changed(root)
   local status = {}
   if changed then
@@ -155,7 +164,7 @@ local function build_tabs(session)
       return { id = "skill:" .. s.name, text = text, label = s.kind, kind = "skills", value = s }
     end, require("vergil.skills").items(root))
   end
-  local commits_cache
+  local commits_cache, branches_cache
   local function commit_items()
     if not commits_cache then
       commits_cache = vim.tbl_map(function(c)
@@ -164,37 +173,69 @@ local function build_tabs(session)
     end
     return commits_cache
   end
+  local function branch_items()
+    if not branches_cache then
+      branches_cache = vim.tbl_map(function(b)
+        local label = table.concat(vim.tbl_filter(function(x) return x ~= "" end, {
+          b.current and "checked out" or "", b.track, b.date,
+        }), " · ")
+        return { id = "branch:" .. b.name, text = b.name .. "  " .. b.subject, label = label, kind = "branches", value = b }
+      end, git.branches(root) or {})
+    end
+    return branches_cache
+  end
 
-  local tabs = {
-    {
-      key = "all",
-      name = "All",
-      load = function(cb)
-        file_items(function(files)
-          -- Changed files first, then skills, the other files, commits.
-          local items = changed_items()
-          vim.list_extend(items, skill_items())
-          for _, f in ipairs(files) do
-            if not status[f.value] then
-              f.label = "file"
-              items[#items + 1] = f
+  local in_repo = changed ~= nil
+  local specs = {
+    files = { key = "files", name = "Files", load = file_items },
+    skills = { key = "skills", name = "Skills", load = function(cb) cb(skill_items()) end },
+  }
+  if in_repo then
+    specs.changed = { key = "changed", name = "Changed", load = function(cb) cb(changed_items()) end }
+    specs.branches = { key = "branches", name = "Branches", load = function(cb) cb(branch_items()) end }
+    specs.commits = { key = "commits", name = "Commits", load = function(cb) cb(commit_items()) end }
+  end
+  specs.all = {
+    key = "all",
+    name = "All",
+    load = function(cb)
+      -- Changed files first, then skills, branches, the other files and
+      -- commits; only from tabs that are turned on.
+      local function finish(files)
+        local items, seen = {}, {}
+        local function add(list, label)
+          for _, item in ipairs(list) do
+            if not seen[item.id] then
+              seen[item.id] = true
+              items[#items + 1] = (label and not item.label) and vim.tbl_extend("force", item, { label = label }) or item
             end
           end
-          for _, c in ipairs(changed and commit_items() or {}) do
-            items[#items + 1] = vim.tbl_extend("force", c, { label = "commit" })
-          end
-          cb(items)
-        end)
-      end,
-    },
-    { key = "files", name = "Files", load = file_items },
+        end
+        local function relabel(list, label)
+          return vim.tbl_map(function(i) return vim.tbl_extend("force", i, { label = label }) end, list)
+        end
+        if enabled.changed and in_repo then add(changed_items()) end
+        if enabled.skills then add(skill_items()) end
+        if enabled.branches and in_repo then add(relabel(branch_items(), "branch")) end
+        add(files, "file")
+        if enabled.commits and in_repo then add(relabel(commit_items(), "commit")) end
+        cb(items)
+      end
+      if enabled.files then
+        file_items(finish)
+      else
+        finish({})
+      end
+    end,
   }
-  if changed then
-    tabs[#tabs + 1] = { key = "changed", name = "Changed", load = function(cb) cb(changed_items()) end }
-    tabs[#tabs + 1] = { key = "commits", name = "Commits", load = function(cb) cb(commit_items()) end }
+
+  local tabs = {}
+  for _, name in ipairs(config.options.picker.tabs) do
+    if specs[name] then
+      tabs[#tabs + 1] = specs[name]
+    end
   end
-  tabs[#tabs + 1] = { key = "skills", name = "Skills", load = function(cb) cb(skill_items()) end }
-  return tabs, git_err
+  return tabs, (not in_repo) and git_err or nil
 end
 
 ---@class vergil.PickOpts
@@ -225,7 +266,13 @@ function M.pick(kind, opts)
       start = i
     end
   end
+  if not start and kind == "all" and #tabs > 0 then
+    start = 1 -- no All tab: open the first one
+  end
   if not start then
+    if not vim.tbl_contains(config.options.picker.tabs, tab_key) then
+      return false, ("the %s tab is turned off (picker.tabs)"):format(tab_key)
+    end
     return false, git_err or ("no %s tab"):format(tab_key)
   end
 
@@ -267,8 +314,8 @@ function M.pick(kind, opts)
   local function mark_info(item)
     local mode = item.kind == "file" and state.mode or item.kind
     local text = vim.trim(M.text_for(mode, item.value) or "")
-    local sign = ({ attach = "@", mention = "`", skills = "/", commits = "◆" })[mode] or "•"
-    local label = ({ attach = "attach", mention = "mention", skills = "skill", commits = "commit" })[mode]
+    local sign = ({ attach = "@", mention = "`", skills = "/", commits = "◆", branches = "⎇" })[mode] or "•"
+    local label = ({ attach = "attach", mention = "mention", skills = "skill", commits = "commit", branches = "branch" })[mode]
     return { sign = sign, text = text, label = label, data = { text = text, kind = item.kind } }
   end
 
@@ -300,6 +347,9 @@ function M.pick(kind, opts)
         return { lines = require("vergil.skills").contents(item.value, session.root), ft = "markdown" }
       elseif item.kind == "commits" then
         return { lines = require("vergil.git").show(session.root, item.value.hash), ft = "git" }
+      elseif item.kind == "branches" then
+        local git = require("vergil.git")
+        return { lines = git.object_lines(session.root, { type = "branch", name = item.value.name }), ft = "git" }
       end
     end,
     actions = {
@@ -341,18 +391,21 @@ function M.pick(kind, opts)
       {
         keys = keys.diff,
         desc = "diff",
-        when = function(t) return t.key == "commits" or t.key == "all" end,
+        when = function(t) return t.key == "commits" or t.key == "branches" or t.key == "all" end,
         fn = function(p)
           local item = p.current()
-          if not item or item.kind ~= "commits" then
+          if not item or (item.kind ~= "commits" and item.kind ~= "branches") then
             return
           end
+          -- A commit's own changes; a branch's changes since it split off.
+          local rev = item.kind == "commits" and (item.value.hash .. "^!")
+            or ((require("vergil.git").current_branch(session.root) or "HEAD") .. "..." .. item.value.name)
           p.close_windows()
           if vim.api.nvim_win_is_valid(ctx.win) then
             vim.api.nvim_set_current_win(ctx.win)
             vim.api.nvim_win_set_cursor(ctx.win, { ctx.row + 1, 0 })
           end
-          local ok, err = require("vergil.diff").insert(item.value.hash .. "^!")
+          local ok, err = require("vergil.diff").insert(rev)
           if not ok then
             vim.notify("vergil: " .. err, vim.log.levels.WARN)
           end

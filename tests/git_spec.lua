@@ -266,11 +266,78 @@ return {
     vim.wait(2000, function() return ui.current().tab_spec().items ~= nil end)
     local row = vim.tbl_filter(function(l) return l:find("a%.lua") end, shown())[1]
     h.truthy(row:match("^@ a%.lua"), row)
-    feed("<M-4>") -- Commits
+    feed("<M-5>") -- Commits
     feed("<Tab>")
     local marks = vim.api.nvim_buf_get_lines(ui.current().bufs.marks, 0, -1, false)
     h.truthy(marks[2]:match("^◆ `%x+` %(init%)%s+commit$"), marks[2])
     feed("<CR>")
     h.truthy(text(b)[1]:match("^@a%.lua `%x+` %(init%)$"), text(b)[1])
+  end,
+  ["Branches tab: current first, inserted with (branch), <C-d> diffs since the split"] = function()
+    local top = repo()
+    sh(top, "add", "-A")
+    sh(top, "commit", "-q", "-m", "Second")
+    local main = vim.trim(sh(top, "branch", "--show-current"))
+    sh(top, "checkout", "-q", "-b", "feature/x")
+    vim.fn.writefile({ "feature" }, top .. "/a.lua")
+    sh(top, "commit", "-q", "-am", "Feature work")
+    sh(top, "checkout", "-q", main)
+    local b = prompt_in(top, { "Merge" }, "git-branches")
+    vim.api.nvim_win_set_cursor(0, { 1, 4 })
+    open("branches")
+    local list = shown()
+    h.truthy(list[1]:match("^  " .. vim.pesc(main) .. "  Second%s+checked out"), list[1])
+    h.truthy(list[2]:match("^  feature/x  Feat"), list[2])
+    feed("<Down><Tab>")
+    local marks = vim.api.nvim_buf_get_lines(ui.current().bufs.marks, 0, -1, false)
+    h.truthy(marks[1]:match("^⎇ `feature/x` %(branch%)%s+branch$"), marks[1])
+    feed("<CR>")
+    h.eq(text(b), { "Merge `feature/x` (branch)" })
+    open("branches")
+    feed("<Down><C-d>")
+    local lines = text(b)
+    h.truthy(contains(lines, ("Output of `git diff %s...feature/x`:"):format(main)), vim.inspect(lines))
+    h.truthy(contains(lines, "+feature"), vim.inspect(lines))
+  end,
+  ["K, gd and :Vergil open on commits and branches"] = function()
+    local top = repo()
+    sh(top, "add", "-A")
+    sh(top, "commit", "-q", "-m", "Second")
+    sh(top, "branch", "feature/y")
+    local hash = git.commits(top)[1].hash
+    local b, client = prompt_in(top, { ("see `%s` (Second) and `feature/y` (branch) and `nothing`"):format(hash) }, "git-hover")
+    local function hover(col)
+      local res = client:request_sync("textDocument/hover", {
+        textDocument = { uri = vim.uri_from_bufnr(b) }, position = { line = 0, character = col },
+      }, 2000, b)
+      return res.result and res.result.contents.value
+    end
+    local commit = hover(6)
+    h.truthy(commit and commit:find("· commit · t, ", 1, true) and commit:find("Second", 1, true), commit)
+    local branch = hover(#("see `" .. hash .. "` (Second) and `f"))
+    h.truthy(branch and branch:find("**feature/y** · branch", 1, true), branch)
+    h.eq(hover(#("see `" .. hash .. "` (Second) and `feature/y` (branch) and `no")), nil, "not a commit or branch")
+    h.eq(vim.diagnostic.get(b), {}, "no diagnostics for commits and branches")
+
+    local def = client:request_sync("textDocument/definition", {
+      textDocument = { uri = vim.uri_from_bufnr(b) }, position = { line = 0, character = 6 },
+    }, 2000, b).result
+    h.truthy(def.uri:match("^vergil://git/commit/%x+$"), def.uri)
+    local shown_buf = vim.uri_to_bufnr(def.uri)
+    h.truthy(contains(vim.api.nvim_buf_get_lines(shown_buf, 0, -1, false), "+new"))
+    h.eq(vim.bo[shown_buf].filetype, "git")
+
+    vim.api.nvim_win_set_cursor(0, { 1, #("see `" .. hash .. "` (Second) and `f") })
+    h.eq(require("vergil").open(), true)
+    h.eq(vim.api.nvim_buf_get_name(0), "vergil://git/branch/feature/y")
+    h.truthy(table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n"):find("Second", 1, true))
+    vim.cmd("buffer " .. b)
+    vim.api.nvim_win_set_cursor(0, { 1, 6 })
+    h.eq(require("vergil").preview(), true)
+    local float = vim.b[b].lsp_floating_preview
+    h.truthy(float and vim.api.nvim_win_is_valid(float))
+    h.truthy(table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(float), 0, -1, false), "\n"):find("commit", 1, true))
+    h.eq(require("vergil").preview(), true, "again: closes (preview.on_repeat)")
+    h.eq(vim.api.nvim_win_is_valid(float), false)
   end,
 }

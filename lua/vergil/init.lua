@@ -61,8 +61,19 @@ function M.preview()
     local _, skill = hover.skill_at(s, row - 1, col)
     contents = skill and require("vergil.skills").contents(skill, s.root)
   end
+  if not contents or (ref and ref.git) then
+    local git = require("vergil.git")
+    local obj = git.object_at(s, row - 1, col)
+    contents = obj and git.object_hover(s.root, obj) or contents
+  end
   if not contents then
     return false, "no reference under the cursor"
+  end
+  -- Pressing it again with the preview open: close it, or move into it.
+  local open_win = vim.b.lsp_floating_preview
+  if open_win and vim.api.nvim_win_is_valid(open_win) and require("vergil.config").options.preview.on_repeat == "close" then
+    vim.api.nvim_win_close(open_win, true)
+    return true
   end
   vim.lsp.util.open_floating_preview(contents, "markdown", { border = "rounded", focus_id = "vergil-preview" })
   return true
@@ -87,7 +98,18 @@ function M.open(how)
   if not target then
     local _, skill = require("vergil.lsp.hover").skill_at(s, row - 1, col)
     if not (skill and skill.path) then
-      return false, terr
+      local git = require("vergil.git")
+      local obj = git.object_at(s, row - 1, col)
+      if not obj then
+        return false, terr
+      end
+      s.jump = nil
+      local bufnr = git.object_buffer(s.root, obj)
+      if how then
+        vim.cmd(OPEN_CMDS[how])
+      end
+      vim.api.nvim_win_set_buf(0, bufnr)
+      return true
     end
     target = { abs = skill.path, line = 1, type = "file" }
   end

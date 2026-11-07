@@ -125,7 +125,8 @@ end
 ---@return integer left_len bytes of the (fitted) left part
 ---@return integer? label_start byte column of the label
 local function columns(left, label, width)
-  label = label or ""
+  -- The name matters more: a label takes at most about 40% of the width.
+  label = fit(label or "", math.max(8, math.floor(width * 0.4)))
   local room = width - (label ~= "" and vim.fn.strdisplaywidth(label) + 2 or 0)
   left = fit(left, math.max(1, room))
   if label == "" then

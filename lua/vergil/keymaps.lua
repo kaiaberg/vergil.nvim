@@ -5,6 +5,7 @@ local M = {}
 
 ---@type { lhs: string, plug: string, desc: string, mode: string? }[]
 M.preset = {
+  { lhs = "K", plug = "<Plug>(vergil-hover)", desc = "Preview; again closes it (preview.on_repeat)" },
   { lhs = "gs", plug = "<Plug>(vergil-snippet)", desc = "Replace reference with its lines" },
   { lhs = "gb", plug = "<Plug>(vergil-snippet-both)", desc = "Add the reference's lines below" },
   { lhs = "<Esc>", plug = "<Plug>(vergil-close-preview)", desc = "Close the preview, or Esc" },
@@ -91,6 +92,17 @@ function M.define_plugs()
     ["open-tab"] = { act(function() return vergil().open("tab") end, "<C-w>gf"), "open the reference in a tab" },
     ["submit"] = { act(function() return require("vergil.submit").submit() end), "submit the prompt" },
     ["abort"] = { act(function() return require("vergil.submit").abort() end), "abort and restore the prompt" },
+    ["hover"] = {
+      function()
+        local win = vim.b.lsp_floating_preview
+        if win and vim.api.nvim_win_is_valid(win) and require("vergil.config").options.preview.on_repeat == "close" then
+          vim.api.nvim_win_close(win, true)
+        else
+          vim.lsp.buf.hover() -- opens it, or moves into an open one
+        end
+      end,
+      "preview (LSP hover); again closes or focuses it",
+    },
     ["close-preview"] = {
       function()
         if not M.close_preview() then

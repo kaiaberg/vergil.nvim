@@ -32,6 +32,10 @@ return {
     h.eq(summary(parse("see `a.lua#L3-L9` (`M.apply`) and `b.lua` (`c.lua`)")), { "mention:a.lua", "mention:b.lua", "mention:c.lua" })
     h.eq(summary(parse("`a.lua#L3` (`x.lua`) `a.lua#L4` `y.lua`")), { "mention:a.lua", "mention:a.lua", "mention:y.lua" })
   end,
+  ["`name` (branch) is a git branch, not a file"] = function()
+    local refs = parse("merge `feature/login` (branch) into `src/a.lua`")
+    h.eq({ refs[1].git, refs[1].explicit, refs[2].git }, { "branch", false, nil })
+  end,
   ["spans match the source text exactly"] = function()
     local lines = { 'a @x.ts, `y/z.md#L3` @"q r.md" `c.lua` end' }
     for _, r in ipairs(parser.parse(lines, h.opts())) do
