@@ -20,8 +20,12 @@ holds the conversation.
 
 - [Requirements](#requirements)
 - [Installation](#installation)
-- [Quick tour](#quick-tour)
+- [Quick start](#quick-start)
 - [Attach or mention?](#attach-or-mention)
+- [Picking lines](#picking-lines)
+- [Previews and navigation](#previews-and-navigation)
+- [Diagnostics](#diagnostics)
+- [Handing the prompt back](#handing-the-prompt-back)
 - [Writing prompts ahead of time](#writing-prompts-ahead-of-time)
 - [The picker](#the-picker)
 - [Git](#git)
@@ -84,26 +88,77 @@ Run `:checkhealth vergil` to check the setup.
 vergil turns itself on in Claude Code's prompt files (`claude-prompt-*.md`)
 and nowhere else. Use `:Vergil enable` for any other buffer.
 
-## Quick tour
+## Quick start
 
-Press `Ctrl+G` in Claude Code. Neovim opens with your prompt.
+One prompt, from start to finish. Say you're asking about a bug in token
+handling:
 
-**`@` attaches a file.** Type `@` and part of a name:
+1. **Open the prompt.** In Claude Code, start typing your question and press
+   `Ctrl+G`. Neovim opens with what you typed.
+2. **Point at the file.** Type `@sess` and accept `src/auth/session.ts` from
+   the completion menu:
 
-```markdown
-Why does this fail when the token expires? @sess
-                                            ▸ src/auth/session.ts   4.2 KB
-```
+   ```markdown
+   Why does this fail when the token expires? @src/auth/session.ts
+   ```
 
-Accepting inserts `@src/auth/session.ts`, or `@"docs/my notes.md"` with quotes
-when the path has spaces. Files you already attached are marked `· attached`.
+3. **Narrow it to the lines that matter.** Type `#` right after the
+   reference. A float shows the file. Find the code with `/refresh`, select
+   the lines with `V` and a motion, and press `Enter`. The attachment becomes
+   a mention of those lines:
 
-**`@@` mentions a file** without loading it: `@@sess` becomes
-`` `src/auth/session.ts` ``.
+   ```markdown
+   Why does this fail when the token expires? `src/auth/session.ts#L12-L35`
+   ```
 
-**`#` picks lines.** Type `#` straight after a reference. A float opens with
-the file, read-only and highlighted. Move with any Vim motion or `/` search,
-select with `V`, then:
+   The agent knows exactly where to look, without loading the whole file
+   ([why that helps](#attach-or-mention)).
+4. **Check it.** `K` on the reference shows the lines it points at.
+5. **Hand it back.** `:Vergil submit` writes the prompt and closes Neovim
+   (`ZZ` with the [preset](#mappings)). The prompt is back in Claude Code;
+   press Enter there to send it.
+
+### What else vergil does
+
+| To | Do | More |
+|---|---|---|
+| Mention a file without loading it | `@@sess` gives `` `src/auth/session.ts` `` | [Attach or mention?](#attach-or-mention) |
+| Paste lines verbatim | `gs` in the line selector (`gb` adds them below the mention) | [Picking lines](#picking-lines) |
+| Point at a function by name | `gO` in the line selector | [Picking lines](#picking-lines) |
+| Search files, skills and git with a preview | `<C-g>` while typing (preset), or `:Vergil pick` | [The picker](#the-picker) |
+| Use a skill or command | `/` completes them, with descriptions | [The picker](#the-picker) |
+| Open what a reference points at | `gd`; `:q` brings you back | [Previews and navigation](#previews-and-navigation) |
+| Send lines from a file back | select them there, `:'<,'>Vergil send` | [Previews and navigation](#previews-and-navigation) |
+| Attach changed files, or insert a diff | `:Vergil pick changed`, `:Vergil diff` | [Git](#git) |
+| Fix what vergil flags | `gra` on a diagnostic | [Diagnostics](#diagnostics) |
+| Keep the prompt as it was | `:Vergil abort` (`ZQ` with the preset) | [Handing the prompt back](#handing-the-prompt-back) |
+
+## Attach or mention?
+
+Virgil's advice to Dante works here too: often it's enough to *look, and pass*.
+
+| | Attachment `@file` | Mention `` `file` `` |
+|---|---|---|
+| Effect | The agent loads the whole file into the conversation | The agent knows where to look, and reads it only if needed |
+| Context cost | Immediate | Only if the agent reads it |
+| Line ranges | Usually ignored: attachments are whole files | `` `file#L12-L35` `` points at exact lines |
+| Large files | May be skipped or cut ([details](#observed-behaviour)) | No limit |
+
+Attach the files the agent must read in full, once. Mention everything else,
+especially with line ranges. vergil never flags mentions of a file you already
+attached, because attaching once and then mentioning is the pattern to use.
+
+How an agent treats attachments isn't documented and changes between releases.
+[Observed behaviour](#observed-behaviour) lists what vergil last saw.
+
+In the `@` menu, files you already attached are marked `· attached`. Paths
+with spaces are quoted: `@"docs/my notes.md"`.
+
+## Picking lines
+
+Type `#` straight after a reference. A float opens with the file, read-only
+and highlighted. Move with any Vim motion or `/` search, select with `V`,
+then:
 
 | Key | Inserts |
 |---|---|
@@ -133,60 +188,36 @@ if (!token) {
 ```
 ````
 
-**Need more room? `<C-g>`** (with the preset) turns what you're typing into
-the full [picker](#the-picker): `@sess` opens the Files tab searching for
-`sess`, with a preview, and the other tabs one key away. Any other word
-before the cursor, like `sess`, opens the All tab searching for it. You come
-back in the mode you left.
+## Previews and navigation
 
-**`/` completes skills and commands**, from your project, your personal
-`~/.claude` and enabled plugins, with descriptions and argument hints.
-Accepting inserts the command; whether it runs is up to Claude Code.
+`K` previews a reference: the referenced lines, or the start of the file. On
+a `/skill` it shows the skill's description; on a commit or branch, its
+details ([Git](#git)). Pressed again, `K` closes the preview.
 
-**Look before you leap.** `K` previews a reference: the referenced lines, or
-the start of the file. On a `/skill` it shows the skill's description. `gd`
-opens the target at its line, and `:Vergil open split|vsplit|tab` opens it
-elsewhere. `:q` in a file opened this way brings you back to the prompt.
+`gd` opens the target at its line, and `:Vergil open split|vsplit|tab` opens
+it elsewhere. `:q` in a file opened this way brings you back to the prompt.
 
 **Send lines back.** In a file opened with `gd`, select lines with any motion
 and run `:'<,'>Vergil send` (`<CR>` in Visual mode with the preset; `gs` sends
 a snippet, `gb` both). The reference you opened becomes a ranged mention, and
 you're back in the prompt. `<C-^>` returns to the file for more.
 
-**Review what you changed.** `:Vergil pick changed` lists files changed in
-git with their status; mark several with `<Tab>` to attach them at once.
-`:Vergil diff` inserts the uncommitted changes as a `diff` block (`staged`, or
-a revision like `HEAD~1`, for others). `:Vergil pick commits` inserts commits
-as `` `abc1234` (Fix token refresh) ``. See [Git](#git).
+## Diagnostics
 
-**Fix what vergil flags.** Diagnostics point out files attached twice,
-large attachments, line ranges past the end of a file or out of step with
-their function, and missing files. `gra` offers fixes: convert an attachment to a mention,
-replace a ranged mention with its snippet, or select lines.
+vergil points out files attached twice, large attachments, line ranges past
+the end of a file or out of step with their function, and missing files.
+`gra` offers fixes: convert an attachment to a mention, replace a ranged
+mention with its snippet, update a range, or select lines. The messages
+hint rather than predict, since what the agent does with a reference can
+change ([Observed behaviour](#observed-behaviour)).
 
-**Hand it back.** `:Vergil submit` (or `ZZ` with the preset) writes the prompt
-and exits. It asks what to do with other files you changed, and never
-discards them silently. `:Vergil abort` (or `ZQ`) restores the prompt from
-before `Ctrl+G`: it writes the original text back and exits with an error, so
+## Handing the prompt back
+
+`:Vergil submit` (or `ZZ` with the preset) writes the prompt and exits. It
+asks what to do with other files you changed, and never discards them
+silently. `:Vergil abort` (or `ZQ`) restores the prompt from before
+`Ctrl+G`: it writes the original text back and exits with an error, so
 either one is enough.
-
-## Attach or mention?
-
-Virgil's advice to Dante works here too: often it's enough to *look, and pass*.
-
-| | Attachment `@file` | Mention `` `file` `` |
-|---|---|---|
-| Effect | The agent loads the whole file into the conversation | The agent knows where to look, and reads it only if needed |
-| Context cost | Immediate | Only if the agent reads it |
-| Line ranges | Usually ignored: attachments are whole files | `` `file#L12-L35` `` points at exact lines |
-| Large files | May be skipped or cut ([details](#observed-behaviour)) | No limit |
-
-Attach the files the agent must read in full, once. Mention everything else,
-especially with line ranges. vergil never flags mentions of a file you already
-attached, because attaching once and then mentioning is the pattern to use.
-
-How an agent treats attachments isn't documented and changes between releases.
-[Observed behaviour](#observed-behaviour) lists what vergil last saw.
 
 ## Writing prompts ahead of time
 
@@ -216,6 +247,10 @@ One picker for everything that can go into a prompt, with tabs:
 | 4 | Branches | `` `feature/login` (branch) ``; `<C-d>` inserts its changes since it split off (only in a repository) |
 | 5 | Commits | `` `abc1234` (subject) ``; `<C-d>` inserts its diff (only in a repository) |
 | 6 | Skills | `/name` |
+
+Skills and commands come from your project, your personal `~/.claude` and
+enabled plugins, and `/` completes them inline too. Inserting one doesn't run
+it; that's up to Claude Code.
 
 Choose the tabs and their order with `picker.tabs`; a tab left out is gone
 from All too:
