@@ -133,7 +133,7 @@ function M.complete(arglead, cmdline)
   if cmdline:match("^%s*%S+%s+pick%s+%S*$") then
     return vim.tbl_filter(function(n)
       return vim.startswith(n, arglead)
-    end, require("vergil.picker").kinds)
+    end, require("vergil.picker.kinds"))
   end
   if cmdline:match("^%s*%S+%s+diff%s+%S*$") then
     return vim.tbl_filter(function(n)

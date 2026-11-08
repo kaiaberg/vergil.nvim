@@ -210,4 +210,21 @@ return {
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "@bin.dat" })
     h.eq({ require("vergil.range").select_at_cursor() }, { false, "binary file: bin.dat" })
   end,
+  ["startup loads only what activation needs"] = function()
+    local repo = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
+    local script = vim.fn.tempname() .. ".lua"
+    vim.fn.writefile({
+      ("vim.opt.rtp:prepend(%q)"):format(repo),
+      'vim.cmd.runtime("plugin/vergil.lua")',
+      "local mods = {}",
+      "for name in pairs(package.loaded) do",
+      '  if name:match("^vergil") then mods[#mods + 1] = name end',
+      "end",
+      "table.sort(mods)",
+      'io.stdout:write(table.concat(mods, " "))',
+    }, script)
+    local res = vim.system({ vim.v.progpath, "--clean", "--headless", "-l", script }, { text = true }):wait(10000)
+    h.eq(res.code, 0, res.stderr)
+    h.eq(res.stdout, "vergil.config vergil.keymaps vergil.picker.kinds vergil.session")
+  end,
 }

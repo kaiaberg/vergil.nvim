@@ -20,7 +20,7 @@ local M = {}
 
 --- `:Vergil pick` arguments: a tab, or `attach`/`mention` for Files in that
 --- mode.
-M.kinds = { "all", "attach", "mention", "skills", "changed", "branches", "commits" }
+M.kinds = require("vergil.picker.kinds")
 
 --- Keys for vergil's own picker actions; `picker.keys` overrides them, like
 --- the generic ones in `vergil.ui.picker`.

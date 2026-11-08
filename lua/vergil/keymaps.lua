@@ -165,7 +165,7 @@ function M.define_plugs()
       end
     end, { desc = "vergil: send lines to the prompt (" .. action .. ")" })
   end
-  for _, kind in ipairs(require("vergil.picker").kinds) do
+  for _, kind in ipairs(require("vergil.picker.kinds")) do
     local lhs = kind == "all" and "<Plug>(vergil-pick)" or ("<Plug>(vergil-pick-%s)"):format(kind)
     vim.keymap.set({ "n", "i" }, lhs, function()
       local ok, err = require("vergil.picker").pick(kind)
