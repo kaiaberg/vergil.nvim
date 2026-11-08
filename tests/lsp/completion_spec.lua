@@ -48,6 +48,36 @@ return {
       h.eq({ item.textEdit.newText, item.insertTextFormat }, { '@"docs/my notes.md"', 2 })
     end
   end,
+  ["outside_query: ~ and absolute paths, one directory at a time"] = function()
+    h.eq({ require("vergil.files").outside_query("~") }, { "~/", "" })
+    h.eq({ require("vergil.files").outside_query("~/co") }, { "~/", "co" })
+    h.eq({ require("vergil.files").outside_query("~/code/ve") }, { "~/code/", "ve" })
+    h.eq({ require("vergil.files").outside_query("/usr/lo") }, { "/usr/", "lo" })
+    h.eq(require("vergil.files").outside_query("src/a"), nil)
+    h.eq(require("vergil.files").outside_query("~user"), nil)
+  end,
+  ["@~ lists the home directory, directories with a slash, no dotfiles"] = function()
+    local home = h.tree({ ["code/x.lua"] = "x\n", ["notes.md"] = "hello\n", [".secret"] = "x\n" })
+    local saved = vim.env.HOME
+    vim.env.HOME = home
+    local ok, err = pcall(function()
+      local res = complete("@~")
+      h.eq(h.labels(res), { "~/code/", "~/notes.md" })
+      h.eq(res.items[1].textEdit.newText, "@~/code/")
+      h.eq(res.items[2].labelDetails.description, "6 B")
+      h.eq(h.labels(complete("@~/no")), { "~/notes.md" })
+      h.eq(h.labels(complete("@~/.s")), { "~/.secret" })
+      h.eq(h.labels(complete("@~/code/")), { "~/code/x.lua" })
+      h.eq(complete("@@~/no").items[1].textEdit.newText, "`~/notes.md`")
+    end)
+    vim.env.HOME = saved
+    assert(ok, err)
+  end,
+  ["@/abs lists that directory"] = function()
+    local res = complete("@" .. root .. "/src/auth/to")
+    h.eq(h.labels(res), { root .. "/src/auth/token.ts" })
+    h.eq(complete("@/no/such/dir/").items, {})
+  end,
   ["a dot in the query keeps matching"] = function()
     h.eq(complete("@views.py").items[1].label, "src/auth/views.py")
   end,

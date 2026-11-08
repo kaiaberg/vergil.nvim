@@ -2,6 +2,10 @@
 --- prompt. `:Vergil pick [tab]` opens it on a tab; `<C-g>` (preset) expands
 --- the inline `@`/`@@`/`/` completion into it, keeping what you typed.
 ---
+--- Outside the project, Files browses a directory at a time when the query
+--- starts with `~` or `/` (All: `~` only, as `/` searches skills there).
+--- Enter on a directory opens it.
+---
 --- Tabs: All, Files, Changed (git), Commits (git), Skills. The git tabs are
 --- left out outside a repository. Files are inserted as attachments or
 --- mentions (`<C-t>` switches; a marked file keeps the mode it was marked
@@ -9,6 +13,7 @@
 --- marks several items, from any tab; `<C-o>` switches how they're joined:
 --- spaces, commas, or one per line.
 local config = require("vergil.config")
+local files = require("vergil.files")
 local formatter = require("vergil.reference.formatter")
 
 local M = {}
@@ -343,6 +348,35 @@ local function build_tabs(session)
   return tabs, git_err
 end
 
+--- Directory items for a query outside the project (`~/co`, `/etc/`), for
+--- the Files and All tabs; nil for anything the tab filters itself.
+---@param tab vergil.PickerTab
+---@param query string
+---@return vergil.PickerItem[]?
+---@return integer[][]?
+function M.search(tab, query)
+  if not (tab.key == "files" or (tab.key == "all" and query:sub(1, 1) == "~")) then
+    return nil
+  end
+  local dir, name = files.outside_query(query)
+  if not dir then
+    return nil
+  end
+  local paths, positions = files.list_dir(dir, name)
+  local items = vim.tbl_map(function(path)
+    local is_dir = path:sub(-1) == "/"
+    return {
+      id = "file:" .. path,
+      text = path,
+      label = is_dir and "dir" or nil,
+      kind = "file",
+      value = path,
+      query = is_dir and path or nil,
+    }
+  end, paths)
+  return items, positions
+end
+
 ---@class vergil.PickOpts
 ---@field query string? initial search
 ---@field replace { row: integer, start_col: integer, end_col: integer }? text to replace (an expanded `@query`)
@@ -452,6 +486,7 @@ function M.pick(kind, opts)
 
   require("vergil.ui.picker").open({
     tabs = tabs,
+    search = M.search,
     tab = start,
     query = opts.query,
     keys = keys,
@@ -472,7 +507,13 @@ function M.pick(kind, opts)
     end,
     preview = function(item)
       if item.kind == "file" then
-        local abs = item.value:sub(1, 1) == "/" and item.value or (session.root .. "/" .. item.value)
+        local abs = require("vergil.reference.resolver").absolute(item.value, session.root)
+        if item.value:sub(-1) == "/" then
+          local names = vim.tbl_map(function(p)
+            return p:sub(#item.value + 1)
+          end, files.list_dir(item.value, ""))
+          return { lines = #names > 0 and names or { "(empty)" } }
+        end
         return { lines = read_head(abs, 400), ft = vim.filetype.match({ filename = abs }) }
       elseif item.kind == "skills" then
         return { lines = require("vergil.skills").contents(item.value, session.root), ft = "markdown" }

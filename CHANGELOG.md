@@ -8,6 +8,10 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- `@~` and `@/` complete paths outside the project one directory at a
+  time, like a shell: `@~` lists your home directory, `@~/co` narrows it.
+  The picker browses them the same way (Files: `~` and `/`, All: `~`);
+  `Enter` on a directory opens it.
 - One picker with tabs, built into vergil: All, Files, Changed, Commits and
   Skills, with fuzzy search, a preview, and cycling tabs
   (`<C-Right>`/`<C-Left>`, `<C-l>`/`<C-h>`, `<M-l>`/`<M-h>`,

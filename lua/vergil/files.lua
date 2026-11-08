@@ -185,6 +185,65 @@ function M.invalidate(root)
   end
 end
 
+--- A query for a path outside the root, browsed one directory at a time
+--- like a shell: `~`, `~/co`, `/usr/lo`. Returns the directory as written
+--- and the partial name after it; nil for queries searched in the root.
+---@param query string
+---@return string? dir ending in `/`
+---@return string? name
+function M.outside_query(query)
+  if query == "~" then
+    return "~/", ""
+  end
+  if query:sub(1, 2) ~= "~/" and query:sub(1, 1) ~= "/" then
+    return nil
+  end
+  return query:match("^(.*/)([^/]*)$")
+end
+
+M.max_dir_entries = 5000
+M.max_dir_matches = 1000
+
+--- Entries of `dir` matching `name`, ranked fuzzy (sorted when `name` is
+--- empty), as paths written like `dir`, with a trailing `/` on
+--- directories. Dotfiles only once `name` starts with `.`.
+---@param dir string as written, e.g. `~/code/`
+---@param name string
+---@return string[] paths
+---@return integer[][] positions matched character indexes into each path
+function M.list_dir(dir, name)
+  local abs = vim.fs.normalize(dir)
+  local names = {}
+  pcall(function()
+    for entry, type in vim.fs.dir(abs) do
+      if name:sub(1, 1) == "." or entry:sub(1, 1) ~= "." then
+        local is_dir = type == "directory" or (type == "link" and vim.fn.isdirectory(abs .. "/" .. entry) == 1)
+        names[#names + 1] = entry .. (is_dir and "/" or "")
+        if #names >= M.max_dir_entries then
+          break
+        end
+      end
+    end
+  end)
+  local positions = {}
+  if name == "" then
+    table.sort(names)
+    names = vim.list_slice(names, 1, M.max_dir_matches)
+  else
+    local res = vim.fn.matchfuzzypos(names, name, { limit = M.max_dir_matches })
+    names = res[1]
+    local offset = vim.fn.strchars(dir)
+    for i, pos in ipairs(res[2]) do
+      positions[i] = vim.tbl_map(function(p)
+        return p + offset
+      end, pos)
+    end
+  end
+  return vim.tbl_map(function(n)
+    return dir .. n
+  end, names), positions
+end
+
 M._builtin_scan = builtin_scan -- exposed for tests
 
 --- Which backend produced the root's cache, for `:checkhealth`.

@@ -36,11 +36,11 @@ end
 ---@field end_col integer 0-based exclusive column where it ends
 ---@field query string
 
---- Characters that should (re)trigger completion. `.`, `/` and `"` keep
---- engines like blink from closing the menu on non-keyword characters.
+--- Characters that should (re)trigger completion. `.`, `/`, `~` and `"`
+--- keep engines like blink from closing the menu on non-keyword characters.
 ---@return string[]
 function M.trigger_characters()
-  local chars = { ".", "/", '"' }
+  local chars = { ".", "/", "~", '"' }
   for _, k in ipairs({ "attach", "mention", "skills" }) do
     local c = config.options.triggers[k]:sub(-1)
     if not vim.tbl_contains(chars, c) then
@@ -140,7 +140,8 @@ local function attached_keys(bufnr, root, token, row)
   return keys
 end
 
-local function build(file_list, token, ctx)
+--- Completion items for paths already ranked.
+local function build(ranked, token, ctx)
   local items = {}
   local attached = attached_keys(ctx.bufnr, ctx.root, token, ctx.row)
   local fmt = config.options.mention.format
@@ -149,10 +150,10 @@ local function build(file_list, token, ctx)
     start = { line = ctx.row, character = token.start_col },
     ["end"] = { line = ctx.row, character = token.end_col },
   }
-  for i, path in ipairs(rank(file_list, token.query)) do
+  for i, path in ipairs(ranked) do
     local text = token.mode == "mention" and formatter.mention(path, nil, nil, fmt) or formatter.attachment(path, adapter)
     if text then
-      local st = vim.uv.fs_stat(ctx.root .. "/" .. path)
+      local st = path:sub(-1) ~= "/" and vim.uv.fs_stat(resolver.absolute(path, ctx.root))
       local detail = st and human_size(st.size) or ""
       if attached[resolver.key(path, ctx.root)] then
         detail = detail .. " · attached"
@@ -256,11 +257,16 @@ function M.handle(params, session, respond)
     return respond({ isIncomplete = true, items = skill_items(skill_token, ctx) })
   end
   local ctx = { bufnr = bufnr, root = session.root, row = row, typed = line:sub(token.start_col + 1, col) }
+  local dir, name = files.outside_query(token.query)
+  if dir then
+    local paths = files.list_dir(dir, name)
+    return respond({ isIncomplete = true, items = build(vim.list_slice(paths, 1, M.max_items), token, ctx) })
+  end
   files.list(session.root, function(file_list)
     if not vim.api.nvim_buf_is_valid(bufnr) then
       return respond(EMPTY)
     end
-    respond({ isIncomplete = true, items = build(file_list, token, ctx) })
+    respond({ isIncomplete = true, items = build(rank(file_list, token.query), token, ctx) })
   end)
 end
 

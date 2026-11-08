@@ -274,9 +274,14 @@ never inside it. Choosing or closing the
 picker returns you to the mode you opened it from. Type to filter; the query stays when you
 switch tabs.
 
+For a file outside the project, start the search with `~` or `/` in Files
+(`~` in All, where `/` searches skills). The picker lists that directory, as
+`@~` completion does. `Enter` on a directory opens it; to insert the
+directory itself, mark it with `<Tab>` first.
+
 | Key | Does |
 |---|---|
-| `Enter` | insert the item, or every marked one |
+| `Enter` | insert the item, or every marked one; open a directory |
 | `<Tab>` / `<S-Tab>` | mark / unmark; a mark shows in every tab |
 | `<C-n>` `<C-p>` `<Down>` `<Up>` | move |
 | `<C-Right>` `<C-l>` `<M-l>` / `<C-Left>` `<C-h>` `<M-h>` | next / previous tab (cycles) |
@@ -363,6 +368,10 @@ For everything else, use the plugins built for it:
 
 vergil is an LSP server running inside Neovim, so any LSP completion engine
 shows its items. A few settings make prompt buffers nicer.
+
+`@` searches the project's files. For a file elsewhere, start the path with
+`~` or `/`: `@~` lists your home directory, and each `/` you type goes one
+directory deeper, like completion in a shell.
 
 **blink.cmp.** Use only the LSP source in prompt buffers, so snippets don't
 pop up while you type prose:

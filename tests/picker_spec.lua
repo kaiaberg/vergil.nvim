@@ -307,6 +307,53 @@ return {
     feed("<Esc>")
     require("vergil").setup({ root = root })
   end,
+  ["~ and / browse outside the project; Enter opens a directory"] = function()
+    local home = h.tree({ ["code/x.lua"] = "ex\n", ["notes.md"] = "hello\n", [".secret"] = "s\n" })
+    local saved = vim.env.HOME
+    vim.env.HOME = home
+    local ok, err = pcall(function()
+      local b = prompt("", 0, "pick-home")
+      open("attach")
+      feed("A~")
+      h.eq(vim.tbl_map(function(l) return l:match("^%s*(%S+)") end, list()), { "~/code/", "~/notes.md" })
+      feed("<CR>")
+      h.truthy(ui.current(), "a directory opens instead of closing")
+      h.eq(line(ui.current().bufs.prompt), "~/code/")
+      h.eq(list()[1]:match("^%s*(%S+)"), "~/code/x.lua")
+      feed("<CR>")
+      h.eq(line(b), "@~/code/x.lua")
+
+      b = prompt("", 0, "pick-home-dir")
+      open("attach")
+      feed("A~/co<Tab><CR>")
+      h.eq(line(b), "@~/code/", "a marked directory is inserted")
+
+      b = prompt("", 0, "pick-home-all")
+      open()
+      h.eq(tab_name(), "All")
+      feed("A~/no<CR>")
+      h.eq(line(b), "@~/notes.md")
+      b = prompt("", 0, "pick-slash-all")
+      open()
+      feed("A/go<CR>")
+      h.eq(line(b), "/go ", "/ still searches skills in All")
+
+      b = prompt("", 0, "pick-abs")
+      open("attach")
+      feed("A" .. home .. "/no<CR>")
+      h.eq(line(b), "@" .. home .. "/notes.md")
+
+      b = prompt("see", 2, "pick-home-expand", { keymaps = { preset = true } })
+      feed("A @~/no<C-g>")
+      loaded()
+      h.eq(list()[1]:match("^%s*(%S+)"), "~/notes.md")
+      feed("<CR>")
+      h.eq(line(b), "see @~/notes.md")
+    end)
+    vim.env.HOME = saved
+    require("vergil").setup({ root = root })
+    assert(ok, err)
+  end,
   ["select_for_path inserts a ranged mention at the position"] = function()
     local b = prompt("see ")
     h.eq(require("vergil.range").select_for_path({ bufnr = b, win = 0, row = 0, col = 4, path = "src/a.lua", from_insert = false }), true)

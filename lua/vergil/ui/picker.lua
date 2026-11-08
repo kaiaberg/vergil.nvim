@@ -14,6 +14,7 @@ local M = {}
 ---@field label string? shown right-aligned, e.g. "modified" or "skill"
 ---@field kind string? what the item is, for the caller
 ---@field value any
+---@field query string? Enter searches for this instead of choosing the item (e.g. a directory to browse into), unless items are marked
 
 ---@class vergil.PickerMarkInfo
 ---@field sign string one or two characters shown before a marked item
@@ -44,6 +45,7 @@ local M = {}
 ---@field tab integer? 1-based tab to start on
 ---@field query string?
 ---@field status (fun(tab: vergil.PickerTab): string)? text in the search line's title
+---@field search (fun(tab: vergil.PickerTab, query: string): vergil.PickerItem[]?, integer[][]?)? items for a query the tab doesn't filter itself, already ranked, with match positions; nil to filter the tab's items
 ---@field preview (fun(item: vergil.PickerItem): { lines: string[], ft: string?, line: integer? }?)?
 ---@field mark_info fun(item: vergil.PickerItem): vergil.PickerMarkInfo snapshot when marking (and for an unmarked choice)
 ---@field actions vergil.PickerAction[]?
@@ -60,6 +62,7 @@ local M = {}
 ---@field selected integer
 ---@field marked vergil.PickerMark[] in the order they were marked
 ---@field closed boolean
+---@field searched boolean? the matches came from `opts.search`
 
 M.limit = 500
 --- The preview (and marked list) show when the picker is at least this wide.
@@ -340,14 +343,20 @@ function M.open(opts)
     end
     local t = tab()
     local out, hls = {}, {}
-    if t.err then
-      out = { "  " .. t.err }
+    local message
+    if P.searched then
+      message = #P.matches == 0 and "No matches" or nil
+    elseif t.err then
+      message = t.err
     elseif not t.items then
-      out = { "  Loading…" }
+      message = "Loading…"
     elseif #t.items == 0 then
-      out = { "  Nothing here" }
+      message = "Nothing here"
     elseif #P.matches == 0 then
-      out = { "  No matches" }
+      message = "No matches"
+    end
+    if message then
+      out = { "  " .. message }
     else
       for i, item in ipairs(P.matches) do
         local m = mark_of(item)
@@ -390,7 +399,14 @@ function M.open(opts)
 
   local function refilter()
     local items = tab().items or {}
-    if P.query == "" then
+    local own, own_pos
+    if opts.search then
+      own, own_pos = opts.search(tab(), P.query)
+    end
+    P.searched = own ~= nil
+    if own then
+      P.matches, P.positions = vim.list_slice(own, 1, M.limit), own_pos or {}
+    elseif P.query == "" then
       P.matches = vim.list_slice(items, 1, M.limit)
       P.positions = {}
     else
@@ -496,6 +512,9 @@ function M.open(opts)
       if not item then
         return
       end
+      if item.query then
+        return P.set_query(item.query)
+      end
       chosen = { { item = item, info = opts.mark_info(item) } }
     end
     local t = tab()
@@ -519,6 +538,14 @@ function M.open(opts)
   end
 
   P.confirm, P.cancel, P.current, P.tab_spec, P.sync = confirm, cancel, current_item, tab, sync
+  --- Replaces the search line and searches for it.
+  function P.set_query(q)
+    if vim.api.nvim_buf_is_valid(prompt_buf) then
+      vim.api.nvim_buf_set_lines(prompt_buf, 0, -1, false, { q })
+      pcall(vim.api.nvim_win_set_cursor, prompt_win, { 1, #q })
+    end
+    sync()
+  end
   --- Re-renders after the caller changed something shown (e.g. the status).
   function P.refresh()
     render_list()

@@ -117,6 +117,11 @@ might do.
 
 Matching is fuzzy and ranked by vergil, so every engine shows the same order.
 Each file shows its size; files already attached are marked "attached".
+
+Outside the project, a query starting with `~` or `/` completes one
+directory at a time, like a shell: `@~` lists your home directory, `@~/co`
+its entries matching "co", `@/etc/` the files in /etc. Directories end in
+`/`; dotfiles show once the name starts with `.`.
 Nothing is offered inside fenced code.
 
 Manual completion (`<C-Space>` in most setups) on an existing reference
@@ -148,7 +153,13 @@ whitespace the search is empty and the choice goes there. From Normal mode,
 |:Vergil-pick| inserts after the word under the cursor, not inside it. Choosing or closing returns to the mode it was opened
 from. Type to filter; the query stays when switching tabs, and tabs cycle.
 
-  <CR>                      Insert the item, or every marked one
+For a file outside the project, start the search with `~` or `/` in Files
+(`~` in All, where `/` searches skills): it lists that directory, like
+completion (|vergil-completion|). <CR> on a directory opens it; mark it with
+<Tab> to insert the directory itself.
+
+  <CR>                      Insert the item, or every marked one; open a
+                            directory
   <Tab> <S-Tab>             Mark, unmark; a mark shows in every tab
   <C-n> <C-p> <Down> <Up>   Move
   <C-Right> <C-l> <M-l>     Next tab
