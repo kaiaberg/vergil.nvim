@@ -28,7 +28,7 @@ local M = {}
 ---@class vergil.PickerTab
 ---@field key string
 ---@field name string
----@field load fun(cb: fun(items: vergil.PickerItem[]?, err: string?)) may call back later
+---@field load fun(cb: fun(items: vergil.PickerItem[]?, err: string?)) may call back later, and again with updated items
 ---@field items vergil.PickerItem[]? filled once loaded
 ---@field err string?
 ---@field loading boolean?
@@ -417,11 +417,25 @@ function M.open(opts)
     end
     t.loading = true
     t.load(function(items, err)
+      local update = t.items ~= nil
       t.loading = false
       t.items, t.err = items, (not items) and (err or "nothing to show") or nil
-      if not P.closed and tab() == t then
-        refilter()
+      if P.closed or tab() ~= t then
+        return
       end
+      -- An update (e.g. git's data arriving) keeps the selected item.
+      local keep = update and P.matches[P.selected]
+      refilter()
+      if keep then
+        for i, m in ipairs(P.matches) do
+          if m.id == keep.id then
+            P.selected = i
+            pcall(vim.api.nvim_win_set_cursor, list_win, { i, 0 })
+            break
+          end
+        end
+      end
+      schedule_preview()
     end)
   end
 
@@ -508,6 +522,13 @@ function M.open(opts)
   --- Re-renders after the caller changed something shown (e.g. the status).
   function P.refresh()
     render_list()
+  end
+  --- Renders the preview again, e.g. once its content has loaded.
+  P.refresh_preview = function()
+    schedule_preview()
+  end
+  P.current_item = function()
+    return current_item()
   end
 
   local map = function(lhs, fn)

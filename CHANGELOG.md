@@ -50,6 +50,10 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- The picker opens without waiting on git: changed files, branches, commits
+  and their previews load in the background, only for tabs that are turned
+  on, and fill in as git answers. Files show up first and get their git
+  status a moment later.
 - The picker no longer uses telescope.nvim or `vim.ui.select`, and
   `picker.backend` is gone (`:checkhealth vergil` warns if it's still set).
   `:Vergil pick` without an argument opens the All tab instead of Files.

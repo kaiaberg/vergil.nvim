@@ -162,27 +162,73 @@ local function build_tabs(session)
   for _, name in ipairs(config.options.picker.tabs) do
     enabled[name] = true
   end
-  local changed, git_err = git.changed(root)
-  local status = {}
-  if changed then
-    changed = vim.tbl_filter(function(f) return keep(f.path) end, changed)
-    for _, f in ipairs(changed) do
-      status[f.path] = f.status
+  -- Git data loads in the background, once per picker and only when a tab
+  -- needs it, so opening the picker never waits on git. Whether the root is
+  -- in a repository is known without running git.
+  local in_repo, git_err = git.in_repo(root)
+  local sources = {} ---@type table<string, { value: any, err: string?, done: boolean, waiters: function[] }>
+  local fetchers = {
+    changed = function(cb)
+      git.changed(root, function(list, err)
+        cb(list and vim.tbl_filter(function(f) return keep(f.path) end, list), err)
+      end)
+    end,
+    commits = function(cb) git.commits(root, nil, cb) end,
+    branches = function(cb) git.branches(root, cb) end,
+  }
+  --- Calls `cb(value, err)` once the source is in (right away if it is).
+  local function source(name, cb)
+    local src = sources[name]
+    if not src then
+      src = { done = false, waiters = {} }
+      sources[name] = src
+      fetchers[name](function(value, err)
+        src.value, src.err, src.done = value, err, true
+        for _, w in ipairs(src.waiters) do
+          w(value, err)
+        end
+        src.waiters = {}
+      end)
+    end
+    if src.done then
+      cb(src.value, src.err)
+    else
+      table.insert(src.waiters, cb)
     end
   end
+  local function status_of()
+    local status = {}
+    local src = sources.changed
+    for _, f in ipairs((src and src.value) or {}) do
+      status[f.path] = f.status
+    end
+    return status
+  end
 
+  local function to_file_items(list)
+    local status, items = status_of(), {}
+    for _, path in ipairs(list or {}) do
+      if keep(path) then
+        items[#items + 1] = { id = "file:" .. path, text = path, label = status[path], kind = "file", value = path }
+      end
+    end
+    return items
+  end
+  --- Files as soon as they're listed; again with git's status labels once
+  --- those are in (the picker keeps the selection).
   local function file_items(cb)
     require("vergil.files").list(root, function(list)
-      local items = {}
-      for _, path in ipairs(list or {}) do
-        if keep(path) then
-          items[#items + 1] = { id = "file:" .. path, text = path, label = status[path], kind = "file", value = path }
-        end
+      cb(to_file_items(list))
+      if in_repo then
+        source("changed", function(changed)
+          if changed and #changed > 0 then
+            cb(to_file_items(list))
+          end
+        end)
       end
-      cb(items)
     end)
   end
-  local function changed_items()
+  local function changed_items(changed)
     return vim.tbl_map(function(f)
       return { id = "file:" .. f.path, text = f.path, label = f.status, kind = "file", value = f.path }
     end, changed or {})
@@ -194,44 +240,49 @@ local function build_tabs(session)
       return { id = "skill:" .. s.name, text = text, label = s.kind, kind = "skills", value = s }
     end, require("vergil.skills").items(root))
   end
-  local commits_cache, branches_cache
-  local function commit_items()
-    if not commits_cache then
-      commits_cache = vim.tbl_map(function(c)
-        return { id = "commit:" .. c.hash, text = c.hash .. "  " .. c.subject, label = ("%s, %s"):format(c.author, c.date), kind = "commits", value = c }
-      end, git.commits(root) or {})
-    end
-    return commits_cache
+  local function commit_items(commits)
+    return vim.tbl_map(function(c)
+      return { id = "commit:" .. c.hash, text = c.hash .. "  " .. c.subject, label = ("%s, %s"):format(c.author, c.date), kind = "commits", value = c }
+    end, commits or {})
   end
-  local function branch_items()
-    if not branches_cache then
-      branches_cache = vim.tbl_map(function(b)
-        local label = table.concat(vim.tbl_filter(function(x) return x ~= "" end, {
-          b.current and "checked out" or "", b.track, b.date,
-        }), " · ")
-        return { id = "branch:" .. b.name, text = b.name .. "  " .. b.subject, label = label, kind = "branches", value = b }
-      end, git.branches(root) or {})
+  local function branch_items(branches)
+    return vim.tbl_map(function(b)
+      local label = table.concat(vim.tbl_filter(function(x) return x ~= "" end, {
+        b.current and "checked out" or "", b.track, b.date,
+      }), " · ")
+      return { id = "branch:" .. b.name, text = b.name .. "  " .. b.subject, label = label, kind = "branches", value = b }
+    end, branches or {})
+  end
+  local function git_tab(name, to_items)
+    return function(cb)
+      source(name, function(value, err)
+        if value then
+          cb(to_items(value))
+        else
+          cb(nil, err)
+        end
+      end)
     end
-    return branches_cache
   end
 
-  local in_repo = changed ~= nil
   local specs = {
     files = { key = "files", name = "Files", load = file_items },
     skills = { key = "skills", name = "Skills", load = function(cb) cb(skill_items()) end },
   }
   if in_repo then
-    specs.changed = { key = "changed", name = "Changed", load = function(cb) cb(changed_items()) end }
-    specs.branches = { key = "branches", name = "Branches", load = function(cb) cb(branch_items()) end }
-    specs.commits = { key = "commits", name = "Commits", load = function(cb) cb(commit_items()) end }
+    specs.changed = { key = "changed", name = "Changed", load = git_tab("changed", changed_items) }
+    specs.branches = { key = "branches", name = "Branches", load = git_tab("branches", branch_items) }
+    specs.commits = { key = "commits", name = "Commits", load = git_tab("commits", commit_items) }
   end
   specs.all = {
     key = "all",
     name = "All",
     load = function(cb)
       -- Changed files first, then skills, branches, the other files and
-      -- commits; only from tabs that are turned on.
-      local function finish(files)
+      -- commits; only from tabs that are turned on. Shown as soon as the
+      -- files are listed, and again as each git source comes in.
+      local files
+      local function build()
         local items, seen = {}, {}
         local function add(list, label)
           for _, item in ipairs(list) do
@@ -244,17 +295,41 @@ local function build_tabs(session)
         local function relabel(list, label)
           return vim.tbl_map(function(i) return vim.tbl_extend("force", i, { label = label }) end, list)
         end
-        if enabled.changed and in_repo then add(changed_items()) end
+        local function got(name)
+          return sources[name] and sources[name].value
+        end
+        if enabled.changed and in_repo then add(changed_items(got("changed"))) end
         if enabled.skills then add(skill_items()) end
-        if enabled.branches and in_repo then add(relabel(branch_items(), "branch")) end
-        add(files, "file")
-        if enabled.commits and in_repo then add(relabel(commit_items(), "commit")) end
+        if enabled.branches and in_repo then add(relabel(branch_items(got("branches")), "branch")) end
+        add(to_file_items(files), "file")
+        if enabled.commits and in_repo then add(relabel(commit_items(got("commits")), "commit")) end
         cb(items)
       end
+      local function start_git()
+        if not in_repo then
+          return
+        end
+        for _, name in ipairs({ "changed", "branches", "commits" }) do
+          -- The Files tab's labels need the status even without Changed.
+          if enabled[name] or (name == "changed" and enabled.files) then
+            source(name, function(value)
+              if value and #value > 0 then
+                build()
+              end
+            end)
+          end
+        end
+      end
       if enabled.files then
-        file_items(finish)
+        require("vergil.files").list(root, function(list)
+          files = list
+          build()
+          start_git()
+        end)
       else
-        finish({})
+        files = {}
+        build()
+        start_git()
       end
     end,
   }
@@ -265,7 +340,7 @@ local function build_tabs(session)
       tabs[#tabs + 1] = specs[name]
     end
   end
-  return tabs, (not in_repo) and git_err or nil
+  return tabs, git_err
 end
 
 ---@class vergil.PickOpts
@@ -332,6 +407,32 @@ function M.pick(kind, opts)
     M.restore(ctx)
   end
 
+  -- Commit and branch previews come from git in the background; "Loading"
+  -- until then, kept per item for this picker.
+  local previews = {}
+  local function git_preview(item)
+    local cached = previews[item.id]
+    if cached then
+      return cached ~= true and { lines = cached, ft = "git" } or { lines = { "Loading…" } }
+    end
+    previews[item.id] = true
+    local git = require("vergil.git")
+    local function done(lines)
+      previews[item.id] = lines
+      local p = require("vergil.ui.picker").current()
+      local now = p and p.current_item and p.current_item()
+      if now and now.id == item.id then
+        p.refresh_preview()
+      end
+    end
+    if item.kind == "commits" then
+      git.show(session.root, item.value.hash, done)
+    else
+      git.object_lines(session.root, { type = "branch", name = item.value.name }, done)
+    end
+    return { lines = { "Loading…" } }
+  end
+
   local function key_hint(name)
     local lhs = keys[name] and keys[name][1]
     return lhs and (lhs:gsub("^<", ""):gsub(">$", "")) or nil
@@ -375,11 +476,8 @@ function M.pick(kind, opts)
         return { lines = read_head(abs, 400), ft = vim.filetype.match({ filename = abs }) }
       elseif item.kind == "skills" then
         return { lines = require("vergil.skills").contents(item.value, session.root), ft = "markdown" }
-      elseif item.kind == "commits" then
-        return { lines = require("vergil.git").show(session.root, item.value.hash), ft = "git" }
-      elseif item.kind == "branches" then
-        local git = require("vergil.git")
-        return { lines = git.object_lines(session.root, { type = "branch", name = item.value.name }), ft = "git" }
+      elseif item.kind == "commits" or item.kind == "branches" then
+        return git_preview(item)
       end
     end,
     actions = {

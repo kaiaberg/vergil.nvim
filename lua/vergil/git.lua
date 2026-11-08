@@ -4,24 +4,92 @@ local M = {}
 
 M.timeout_ms = 3000
 
+local function result(res)
+  if res.code ~= 0 then
+    local msg = vim.trim((res.stderr or ""):gsub("^fatal: ", ""))
+    if msg == "" and (res.code == 124 or (res.signal or 0) ~= 0) then
+      return nil, "git took too long" -- killed by the timeout
+    end
+    return nil, msg ~= "" and msg or ("git exited with %d"):format(res.code)
+  end
+  return res
+end
+
+--- Runs git in the root. Without `cb`, waits (up to `M.timeout_ms`) and
+--- returns the result; with it, returns at once and calls `cb(res, err)`
+--- later, on the main loop. The picker uses the latter, so opening it never
+--- waits on git.
+---@param root string
+---@param args string[]
+---@param cb fun(res: vim.SystemCompleted?, err: string?)?
 ---@return vim.SystemCompleted?
 ---@return string? err
-local function run(root, args)
+local function run(root, args, cb)
+  local function fail(err)
+    if cb then
+      vim.schedule(function()
+        cb(nil, err)
+      end)
+      return
+    end
+    return nil, err
+  end
   if vim.fn.executable("git") ~= 1 then
-    return nil, "git is not installed"
+    return fail("git is not installed")
   end
   local cmd = vim.list_extend({ "git", "-C", root }, args)
+  if cb then
+    local ok, err = pcall(vim.system, cmd, { text = true, timeout = M.timeout_ms }, function(res)
+      vim.schedule(function()
+        cb(result(res))
+      end)
+    end)
+    if not ok then
+      return fail(tostring(err))
+    end
+    return
+  end
   local ok, res = pcall(function()
     return vim.system(cmd, { text = true }):wait(M.timeout_ms)
   end)
   if not ok then
     return nil, tostring(res)
   end
-  if res.code ~= 0 then
-    local msg = vim.trim((res.stderr or ""):gsub("^fatal: ", ""))
-    return nil, msg ~= "" and msg or ("git exited with %d"):format(res.code)
+  return result(res)
+end
+
+--- Whether the root is in a git repository, without running git: true when
+--- git is installed and a `.git` (directory or file) is above the root.
+---@param root string
+---@return boolean
+---@return string? err why not
+function M.in_repo(root)
+  if vim.fn.executable("git") ~= 1 then
+    return false, "git is not installed"
   end
-  return res
+  if not vim.fs.root(root, ".git") then
+    return false, "not a git repository"
+  end
+  return true
+end
+
+--- Runs git and parses its output: synchronously without `cb` (returning
+--- the parsed result), else in the background through `cb`.
+local function either(root, args, parse, cb)
+  if cb then
+    run(root, args, function(res, err)
+      if not res then
+        return cb(nil, err)
+      end
+      cb(parse(res))
+    end)
+    return
+  end
+  local res, err = run(root, args)
+  if not res then
+    return nil, err
+  end
+  return parse(res)
 end
 
 --- A path from the repository's top, written relative to the session root
@@ -62,17 +130,47 @@ end
 --- Files that differ from HEAD, plus untracked ones. Deleted files are left
 --- out: there is nothing to attach.
 ---@param root string
+---@param cb fun(files: vergil.ChangedFile[]?, err: string?)? run in the background
 ---@return vergil.ChangedFile[]? files
 ---@return string? err
-function M.changed(root)
-  local top, err = run(root, { "rev-parse", "--show-toplevel" })
+function M.changed(root, cb)
+  local top_args = { "rev-parse", "--show-toplevel" }
+  local status_args = { "status", "--porcelain=v1", "-z", "--untracked-files=all" }
+  if cb then
+    -- Both at once; parse when both are in.
+    local top, res, err, left = nil, nil, nil, 2
+    local function done()
+      left = left - 1
+      if left == 0 then
+        if top and res then
+          cb(M._parse_changed(top, res, root))
+        else
+          cb(nil, err)
+        end
+      end
+    end
+    run(root, top_args, function(r, e)
+      top, err = r, err or e
+      done()
+    end)
+    run(root, status_args, function(r, e)
+      res, err = r, err or e
+      done()
+    end)
+    return
+  end
+  local top, err = run(root, top_args)
   if not top then
     return nil, err
   end
-  local res, serr = run(root, { "status", "--porcelain=v1", "-z", "--untracked-files=all" })
+  local res, serr = run(root, status_args)
   if not res then
     return nil, serr
   end
+  return M._parse_changed(top, res, root)
+end
+
+function M._parse_changed(top, res, root)
   local toplevel = vim.trim(top.stdout)
   local out = {}
   local fields = vim.split(res.stdout or "", "\0", { plain = true })
@@ -102,13 +200,15 @@ end
 --- Recent commits that touched the root, newest first.
 ---@param root string
 ---@param limit integer?
+---@param cb fun(commits: vergil.Commit[]?, err: string?)? run in the background
 ---@return vergil.Commit[]? commits
 ---@return string? err
-function M.commits(root, limit)
-  local res, err = run(root, { "log", "-n", tostring(limit or 200), "--format=%h%x1f%s%x1f%an%x1f%ar", "--", "." })
-  if not res then
-    return nil, err
-  end
+function M.commits(root, limit, cb)
+  local args = { "log", "-n", tostring(limit or 200), "--format=%h%x1f%s%x1f%an%x1f%ar", "--", "." }
+  return either(root, args, M._parse_commits, cb)
+end
+
+function M._parse_commits(res)
   local out = {}
   for line in (res.stdout or ""):gmatch("[^\n]+") do
     local hash, subject, author, date = line:match("^([^\31]*)\31([^\31]*)\31([^\31]*)\31(.*)$")
@@ -131,13 +231,23 @@ end
 --- `git show` for a commit, for previews.
 ---@param root string
 ---@param hash string
----@return string[]
-function M.show(root, hash)
-  local res, err = run(root, { "show", "--stat", "--patch", "--no-color", "--no-ext-diff", hash, "--", "." })
-  if not res then
-    return { err }
+---@param cb fun(lines: string[])? run in the background
+---@return string[]?
+function M.show(root, hash, cb)
+  local args = { "show", "--stat", "--patch", "--no-color", "--no-ext-diff", hash, "--", "." }
+  local function parse(res, err)
+    if not res then
+      return { err }
+    end
+    return vim.split((res.stdout or ""):gsub("\n$", ""), "\n", { plain = true })
   end
-  return vim.split((res.stdout or ""):gsub("\n$", ""), "\n", { plain = true })
+  if cb then
+    run(root, args, function(res, err)
+      cb(parse(res, err))
+    end)
+    return
+  end
+  return parse(run(root, args))
 end
 
 --- Completion candidates for `:Vergil diff`: `staged`, branches, tags and
@@ -168,17 +278,19 @@ end
 
 --- Local and remote branches: the current one first, then by last commit.
 ---@param root string
+---@param cb fun(branches: vergil.Branch[]?, err: string?)? run in the background
 ---@return vergil.Branch[]? branches
 ---@return string? err
-function M.branches(root)
-  local res, err = run(root, {
+function M.branches(root, cb)
+  local args = {
     "for-each-ref", "--sort=-committerdate",
     "--format=%(refname)%1f%(refname:short)%1f%(HEAD)%1f%(upstream:track,nobracket)%1f%(committerdate:relative)%1f%(subject)",
     "refs/heads", "refs/remotes",
-  })
-  if not res then
-    return nil, err
-  end
+  }
+  return either(root, args, M._parse_branches, cb)
+end
+
+function M._parse_branches(res)
   local out = {}
   for line in (res.stdout or ""):gmatch("[^\n]+") do
     local ref, name, head, track, date, subject = line:match("^([^\31]*)\31([^\31]*)\31([^\31]*)\31([^\31]*)\31([^\31]*)\31(.*)$")
@@ -285,12 +397,18 @@ end
 --- The text `gd` shows for a commit (`git show`) or branch (`git log`).
 ---@param root string
 ---@param obj vergil.GitObject
----@return string[]
-function M.object_lines(root, obj)
-  if obj.type == "commit" then
-    return lines_of(run(root, { "show", "--stat", "--patch", "--no-color", "--no-ext-diff", obj.hash }))
+---@param cb fun(lines: string[])? run in the background
+---@return string[]?
+function M.object_lines(root, obj, cb)
+  local args = obj.type == "commit" and { "show", "--stat", "--patch", "--no-color", "--no-ext-diff", obj.hash }
+    or { "log", "--no-color", "--date=short", "--format=%h %ad %an%n    %s%n", "-n", "200", obj.name, "--" }
+  if cb then
+    run(root, args, function(res)
+      cb(lines_of(res))
+    end)
+    return
   end
-  return lines_of(run(root, { "log", "--no-color", "--date=short", "--format=%h %ad %an%n    %s%n", "-n", "200", obj.name, "--" }))
+  return lines_of(run(root, args))
 end
 
 --- A read-only buffer named `vergil://git/<type>/<name>` showing a commit

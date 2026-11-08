@@ -262,6 +262,40 @@ return {
     h.truthy(err and err ~= "", err)
     h.eq(git.revisions(empty), { "staged" })
   end,
+  ["the picker opens without waiting on git, and fills in when git answers"] = function()
+    local top = repo()
+    local b = prompt_in(top, { "" }, "git-slow")
+    -- A git that takes a second to answer.
+    local bin = vim.fn.tempname()
+    vim.fn.mkdir(bin, "p")
+    vim.fn.writefile({ "#!/bin/sh", "sleep 1", ('exec "%s" "$@"'):format(vim.fn.exepath("git")) }, bin .. "/git")
+    vim.fn.setfperm(bin .. "/git", "rwxr-xr-x")
+    local path = vim.env.PATH
+    vim.env.PATH = bin .. ":" .. path
+    local ok, err = pcall(function()
+      local t0 = vim.uv.hrtime()
+      h.eq(require("vergil.picker").pick("changed"), true)
+      local ms = (vim.uv.hrtime() - t0) / 1e6
+      h.truthy(ms < 500, ("opening took %d ms"):format(ms))
+      h.truthy(ui.current(), "open while git runs")
+      h.eq(ui.current().tab_spec().items, nil, "still loading")
+      vim.wait(5000, function() return ui.current().tab_spec().items ~= nil end)
+      h.truthy(shown()[1]:match("a%.lua%s+modified$"), shown()[1])
+      -- Commit previews load in the background too.
+      ui.current().switch(5) -- default tabs: All, Files, Changed, Branches, Commits
+      vim.wait(5000, function() return ui.current().tab_spec().items ~= nil end)
+      h.eq(ui.current().tab_spec().name, "Commits")
+      vim.wait(200)
+      local preview = function() return vim.api.nvim_buf_get_lines(ui.current().bufs.preview, 0, 1, false)[1] end
+      h.eq(preview(), "Loading…")
+      vim.wait(5000, function() return preview() ~= "Loading…" end)
+      h.truthy(preview():match("^commit %x+"), preview())
+    end)
+    vim.env.PATH = path
+    ui.close()
+    vim.api.nvim_buf_delete(b, { force = true })
+    assert(ok, err)
+  end,
   ["a file marked in one tab is marked in the others"] = function()
     local top = repo()
     local b = prompt_in(top, { "" }, "git-crosstab")
@@ -272,6 +306,7 @@ return {
     local row = vim.tbl_filter(function(l) return l:find("a%.lua") end, shown())[1]
     h.truthy(row:match("^@ a%.lua"), row)
     feed("<M-5>") -- Commits
+    vim.wait(2000, function() return ui.current().tab_spec().items ~= nil end)
     feed("<Tab>")
     local marks = vim.api.nvim_buf_get_lines(ui.current().bufs.marks, 0, -1, false)
     h.truthy(marks[2]:match("^◆ `%x+` %(init%)%s+commit$"), marks[2])

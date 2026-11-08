@@ -317,7 +317,7 @@ return {
   ["errors"] = function()
     prompt("")
     h.eq({ picker.pick("nope") }, { false, 'unknown picker "nope"; expected all, attach, mention, skills, changed, branches, commits' })
-    h.eq({ picker.pick("commits") }, { false, "not a git repository (or any of the parent directories): .git" })
+    h.eq({ picker.pick("commits") }, { false, "not a git repository" })
     h.errors(function() require("vergil").setup({ picker = { on_trigger = "yes" } }) end, "picker.on_trigger")
     vim.cmd.enew()
     h.eq({ picker.pick() }, { false, "not enabled in this buffer (use :Vergil enable)" })
