@@ -19,8 +19,8 @@ M.subcommands = {
       notify(err, vim.log.levels.WARN)
     end
   end,
-  open = function(args)
-    local ok, err = require("vergil").open(args[1])
+  open = function(args, opts)
+    local ok, err = require("vergil").open(args[1], opts.smods)
     if not ok then
       notify(err, vim.log.levels.WARN)
     end

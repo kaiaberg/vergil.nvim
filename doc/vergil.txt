@@ -327,7 +327,9 @@ prompt from before `Ctrl+G`, even if it was written in between.
 
 :Vergil open [{how}]                                       *:Vergil-open*
     Open the target of the reference or skill under the cursor, in the
-    current window or as {how}: `split`, `vsplit` or `tab`.
+    current window or as {how}: `split`, `vsplit` or `tab`. Modifiers
+    such as |:vertical|, |:botright| and |:tab| apply, e.g.
+    `:botright Vergil open vsplit`.
 
 :Vergil range                                             *:Vergil-range*
     Select lines for the reference under the cursor.
@@ -554,7 +556,7 @@ Lua API: `require("vergil")`
   `enable(bufnr?)`        Turn on in a buffer.
   `disable(bufnr?)`       Turn off.
   `references(bufnr?)`    References in a buffer, with exact spans.
-  `toggle()`, `preview()`, `open(how?)`
+  `toggle()`, `preview()`, `open(how?, mods?)`
                           The actions behind the commands; they return
                           `ok, err`.
 

@@ -121,9 +121,10 @@ local OPEN_CMDS = { split = "split", vsplit = "vsplit", tab = "tabedit" }
 --- Opens the target of the reference under the cursor at its line. Commits
 --- and branches need git, so they open once git answers.
 ---@param how? "split"|"vsplit"|"tab" nil opens in the current window
+---@param mods? vim.api.keyset.cmd.mods command modifiers, e.g. from `:vertical Vergil open split`
 ---@return boolean ok
 ---@return string? err
-function M.open(how)
+function M.open(how, mods)
   if how ~= nil and not OPEN_CMDS[how] then
     return false, ("unknown open mode %q; expected split, vsplit or tab"):format(how)
   end
@@ -154,7 +155,7 @@ function M.open(how)
           end
           s.jump = nil
           if how then
-            vim.cmd(OPEN_CMDS[how])
+            vim.cmd({ cmd = OPEN_CMDS[how], mods = mods })
           end
           vim.api.nvim_win_set_buf(0, bufnr)
         end)
@@ -164,7 +165,7 @@ function M.open(how)
     target = { abs = skill.path, line = 1, type = "file" }
   end
   s.jump = { row = row - 1, col = col, abs = target.abs } -- for :Vergil send
-  vim.cmd({ cmd = how and OPEN_CMDS[how] or "edit", args = { target.abs }, magic = { file = false } })
+  vim.cmd({ cmd = how and OPEN_CMDS[how] or "edit", args = { target.abs }, magic = { file = false }, mods = mods })
   if target.type == "file" then
     local last = vim.api.nvim_buf_line_count(0)
     vim.api.nvim_win_set_cursor(0, { math.min(target.line, last), 0 })

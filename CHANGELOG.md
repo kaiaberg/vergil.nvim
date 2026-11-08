@@ -8,6 +8,8 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- `:Vergil open` respects command modifiers: `:vertical Vergil open split`,
+  `:botright Vergil open vsplit`, `:tab Vergil open split`.
 - `setup()` warns about unknown option names (e.g. `keymap` for
   `keymaps`), and `:checkhealth vergil` lists them. An unknown `agent` and
   non-boolean `completion.*` or `keymaps.preset` values, or malformed
