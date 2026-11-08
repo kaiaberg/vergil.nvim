@@ -339,69 +339,107 @@ end
 ---@field name string as written in the prompt
 ---@field hash string? full hash, for commits
 
+--- Runs several git commands at once and calls `cb(results)` when all are
+--- in, with each slot holding the result or `false` when it failed.
+local function all(root, cmds, cb)
+  local out, left = {}, #cmds
+  for i, args in ipairs(cmds) do
+    run(root, args, function(res)
+      out[i] = res or false
+      left = left - 1
+      if left == 0 then
+        cb(out)
+      end
+    end)
+  end
+end
+
 --- What a word in the prompt names in git: a branch, or a commit (also a
---- tag or other revision). Asks git, so it's only used on `K` and `gd`.
+--- tag or other revision). Asks git in the background, so it's only used on
+--- `K` and `gd`; `cb` gets nil when it names nothing.
 ---@param root string
 ---@param name string
----@return vergil.GitObject?
-function M.object(root, name)
+---@param cb fun(obj: vergil.GitObject?)
+function M.object(root, name, cb)
   if not name or #name > 200 or not name:match("^[%w%._/%-~^]+$") or name:sub(1, 1) == "-" then
-    return nil
+    return vim.schedule(function()
+      cb(nil)
+    end)
   end
-  for _, ref in ipairs({ "refs/heads/" .. name, "refs/remotes/" .. name }) do
-    if run(root, { "show-ref", "--verify", "--quiet", ref }) then
-      return { type = "branch", name = name }
+  all(root, {
+    { "show-ref", "--verify", "--quiet", "refs/heads/" .. name },
+    { "show-ref", "--verify", "--quiet", "refs/remotes/" .. name },
+    { "rev-parse", "--verify", "--quiet", name .. "^{commit}" },
+  }, function(r)
+    if r[1] or r[2] then
+      return cb({ type = "branch", name = name })
     end
-  end
-  local res = run(root, { "rev-parse", "--verify", "--quiet", name .. "^{commit}" })
-  local hash = res and vim.trim(res.stdout or "")
-  if hash and hash ~= "" then
-    return { type = "commit", name = name, hash = hash }
-  end
+    local hash = r[3] and vim.trim(r[3].stdout or "")
+    cb(hash and hash ~= "" and { type = "commit", name = name, hash = hash } or nil)
+  end)
 end
 
 local function lines_of(res)
   return vim.split(((res and res.stdout) or ""):gsub("\n$", ""), "\n", { plain = true })
 end
 
---- Markdown for `K` on a commit or branch.
+--- Markdown for `K` on a commit or branch, in the background.
 ---@param root string
 ---@param obj vergil.GitObject
----@return string[]
-function M.object_hover(root, obj)
+---@param cb fun(lines: string[])
+function M.object_hover(root, obj, cb)
   if obj.type == "commit" then
-    local head = run(root, { "show", "-s", "--format=%h%x1f%an%x1f%ar%x1f%B", obj.hash })
-    local h, author, date, body = ((head and head.stdout) or ""):match("^([^\31]*)\31([^\31]*)\31([^\31]*)\31(.*)$")
-    local out = { ("**%s** · commit · %s, %s"):format(h or obj.name, author or "?", date or "?"), "" }
-    vim.list_extend(out, vim.split(vim.trim(body or ""), "\n", { plain = true }))
-    local stat = run(root, { "show", "--stat", "--format=", "--no-color", obj.hash })
-    if stat and vim.trim(stat.stdout or "") ~= "" then
-      vim.list_extend(out, { "", "```" })
-      vim.list_extend(out, lines_of(stat))
-      out[#out + 1] = "```"
-    end
-    return out
+    return all(root, {
+      { "show", "-s", "--format=%h%x1f%an%x1f%ar%x1f%B", obj.hash },
+      { "show", "--stat", "--format=", "--no-color", obj.hash },
+    }, function(r)
+      local head, stat = r[1], r[2]
+      local h, author, date, body = ((head and head.stdout) or ""):match("^([^\31]*)\31([^\31]*)\31([^\31]*)\31(.*)$")
+      local out = { ("**%s** · commit · %s, %s"):format(h or obj.name, author or "?", date or "?"), "" }
+      vim.list_extend(out, vim.split(vim.trim(body or ""), "\n", { plain = true }))
+      if stat and vim.trim(stat.stdout or "") ~= "" then
+        vim.list_extend(out, { "", "```" })
+        vim.list_extend(out, lines_of(stat))
+        out[#out + 1] = "```"
+      end
+      cb(out)
+    end)
   end
-  local info
-  for _, b in ipairs(M.branches(root) or {}) do
-    if b.name == obj.name then
-      info = b
+  local branches, log, left = nil, nil, 2
+  local function done()
+    left = left - 1
+    if left > 0 then
+      return
     end
+    local info
+    for _, b in ipairs(branches or {}) do
+      if b.name == obj.name then
+        info = b
+      end
+    end
+    local parts = { ("**%s** · branch"):format(obj.name) }
+    if info then
+      if info.current then
+        parts[#parts + 1] = "checked out"
+      end
+      if info.track ~= "" then
+        parts[#parts + 1] = info.track
+      end
+      parts[#parts + 1] = "last commit " .. info.date
+    end
+    local out = { table.concat(parts, " · "), "", "```" }
+    vim.list_extend(out, lines_of(log))
+    out[#out + 1] = "```"
+    cb(out)
   end
-  local parts = { ("**%s** · branch"):format(obj.name) }
-  if info then
-    if info.current then
-      parts[#parts + 1] = "checked out"
-    end
-    if info.track ~= "" then
-      parts[#parts + 1] = info.track
-    end
-    parts[#parts + 1] = "last commit " .. info.date
-  end
-  local out = { table.concat(parts, " · "), "", "```" }
-  vim.list_extend(out, lines_of(run(root, { "log", "--oneline", "--no-color", "-n", "15", obj.name, "--" })))
-  out[#out + 1] = "```"
-  return out
+  M.branches(root, function(b)
+    branches = b
+    done()
+  end)
+  run(root, { "log", "--oneline", "--no-color", "-n", "15", obj.name, "--" }, function(res)
+    log = res
+    done()
+  end)
 end
 
 --- The text `gd` shows for a commit (`git show`) or branch (`git log`).
@@ -422,38 +460,39 @@ function M.object_lines(root, obj, cb)
 end
 
 --- A read-only buffer named `vergil://git/<type>/<name>` showing a commit
---- or branch, for `gd` and `:Vergil open`.
+--- or branch, for `gd` and `:Vergil open`. Calls `cb` once it's filled.
 ---@param root string
 ---@param obj vergil.GitObject
----@return integer bufnr
----@return string uri
-function M.object_buffer(root, obj)
-  local uri = ("vergil://git/%s/%s"):format(obj.type, obj.type == "commit" and obj.hash:sub(1, 12) or obj.name)
-  local bufnr = vim.fn.bufnr("^" .. vim.fn.escape(uri, "\\/.*$^~[]") .. "$")
-  if bufnr == -1 then
-    bufnr = vim.api.nvim_create_buf(true, false)
-    vim.api.nvim_buf_set_name(bufnr, uri)
-  end
-  vim.bo[bufnr].buftype = "nofile"
-  vim.bo[bufnr].bufhidden = "hide"
-  vim.bo[bufnr].swapfile = false
-  vim.bo[bufnr].modifiable = true
-  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, M.object_lines(root, obj))
-  vim.bo[bufnr].modifiable = false
-  vim.bo[bufnr].modified = false
-  vim.bo[bufnr].filetype = "git"
-  return bufnr, uri
+---@param cb fun(bufnr: integer, uri: string)
+function M.object_buffer(root, obj, cb)
+  M.object_lines(root, obj, function(lines)
+    local uri = ("vergil://git/%s/%s"):format(obj.type, obj.type == "commit" and obj.hash:sub(1, 12) or obj.name)
+    local bufnr = vim.fn.bufnr("^" .. vim.fn.escape(uri, "\\/.*$^~[]") .. "$")
+    if bufnr == -1 then
+      bufnr = vim.api.nvim_create_buf(true, false)
+      vim.api.nvim_buf_set_name(bufnr, uri)
+    end
+    vim.bo[bufnr].buftype = "nofile"
+    vim.bo[bufnr].bufhidden = "hide"
+    vim.bo[bufnr].swapfile = false
+    vim.bo[bufnr].modifiable = true
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+    vim.bo[bufnr].modifiable = false
+    vim.bo[bufnr].modified = false
+    vim.bo[bufnr].filetype = "git"
+    cb(bufnr, uri)
+  end)
 end
 
---- The commit or branch named by the inline code at a position in a prompt
---- buffer: `` `abc1234` ``, `` `main` `` or `` `feature/x` (branch) ``. Only
---- words that aren't existing files are asked about.
+--- The inline code at a position in a prompt buffer that could name a
+--- commit or branch: `` `abc1234` ``, `` `main` `` or `` `feature/x` (branch) ``.
+--- Words that are existing files are left out. Doesn't ask git; pass the
+--- result to `M.object`.
 ---@param session vergil.Session
 ---@param row integer 0-based
 ---@param col integer 0-based
----@return vergil.GitObject?
 ---@return vergil.Reference?
-function M.object_at(session, row, col)
+function M.candidate_at(session, row, col)
   local parser = require("vergil.reference.parser")
   local ref = parser.at(parser.parse_buffer(session.bufnr), row, col)
   if not ref or ref.mode ~= "mention" or ref.start_line or ref.in_fence then
@@ -463,7 +502,25 @@ function M.object_at(session, row, col)
   if target and target.exists then
     return nil
   end
-  return M.object(session.root, ref.path), ref
+  return ref
+end
+
+--- The commit or branch at a position in a prompt buffer, in the
+--- background. `cb` gets nil when there's none.
+---@param session vergil.Session
+---@param row integer 0-based
+---@param col integer 0-based
+---@param cb fun(obj: vergil.GitObject?, ref: vergil.Reference?)
+function M.object_at(session, row, col, cb)
+  local ref = M.candidate_at(session, row, col)
+  if not ref then
+    return vim.schedule(function()
+      cb(nil)
+    end)
+  end
+  M.object(session.root, ref.path, function(obj)
+    cb(obj, obj and ref)
+  end)
 end
 
 --- `git diff` arguments for `:Vergil diff [staged|<rev>]`.

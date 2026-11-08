@@ -27,11 +27,11 @@ local handlers = {
   ["textDocument/completion"] = function(params, session, respond)
     require("vergil.lsp.completion").handle(params, session, respond)
   end,
-  ["textDocument/hover"] = function(params, session)
-    return require("vergil.lsp.hover").handle(params, session)
+  ["textDocument/hover"] = function(params, session, respond)
+    require("vergil.lsp.hover").handle(params, session, respond)
   end,
-  ["textDocument/definition"] = function(params, session)
-    return require("vergil.lsp.definition").handle(params, session)
+  ["textDocument/definition"] = function(params, session, respond)
+    require("vergil.lsp.definition").handle(params, session, respond)
   end,
   ["textDocument/codeAction"] = function(params, session)
     return require("vergil.lsp.code_actions").handle(params, session)
@@ -68,7 +68,7 @@ function M.refresh(bufnr)
 end
 
 --- Handlers that answer through `respond` (possibly later) instead of returning.
-local async = { ["textDocument/completion"] = true }
+local async = { ["textDocument/completion"] = true, ["textDocument/hover"] = true, ["textDocument/definition"] = true }
 
 local function capabilities()
   return {

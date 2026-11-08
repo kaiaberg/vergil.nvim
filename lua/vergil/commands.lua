@@ -96,6 +96,31 @@ function M.names()
   return names
 end
 
+-- Revisions for `:Vergil diff <Tab>`, kept while the command line is open
+-- so each Tab doesn't ask git again.
+local cached ---@type { root: string, list: string[] }?
+
+local function revisions()
+  local session = require("vergil.session")
+  local s = session.get(0)
+  local root = s and s.root or session.root()
+  if cached and cached.root == root then
+    return cached.list
+  end
+  local list = require("vergil.git").revisions(root)
+  if vim.fn.mode() == "c" then
+    cached = { root = root, list = list }
+    vim.api.nvim_create_autocmd("CmdlineLeave", {
+      group = vim.api.nvim_create_augroup("vergil_complete", { clear = true }),
+      once = true,
+      callback = function()
+        cached = nil
+      end,
+    })
+  end
+  return list
+end
+
 ---@param arglead string
 ---@param cmdline string
 ---@return string[]
@@ -111,11 +136,9 @@ function M.complete(arglead, cmdline)
     end, require("vergil.picker").kinds)
   end
   if cmdline:match("^%s*%S+%s+diff%s+%S*$") then
-    local session = require("vergil.session")
-    local s = session.get(0)
     return vim.tbl_filter(function(n)
       return vim.startswith(n, arglead)
-    end, require("vergil.git").revisions(s and s.root or session.root()))
+    end, revisions())
   end
   if cmdline:match("^%s*%S+%s+send%s+%S*$") then
     return vim.tbl_filter(function(n)

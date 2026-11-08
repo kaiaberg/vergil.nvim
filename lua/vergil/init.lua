@@ -44,7 +44,22 @@ local function current_session()
   return s
 end
 
---- Shows a preview of the reference under the cursor in a float.
+--- A check that the cursor is still where it was, for answers that arrive
+--- later: if the user moved on, they're dropped.
+local function still_here()
+  local buf, cursor = vim.api.nvim_get_current_buf(), vim.api.nvim_win_get_cursor(0)
+  return function()
+    local now = vim.api.nvim_win_get_cursor(0)
+    return vim.api.nvim_get_current_buf() == buf and now[1] == cursor[1] and now[2] == cursor[2]
+  end
+end
+
+local function warn(msg)
+  vim.notify("vergil: " .. msg, vim.log.levels.WARN)
+end
+
+--- Shows a preview of the reference under the cursor in a float. Commits
+--- and branches need git, so their preview opens once git answers.
 ---@return boolean ok
 ---@return string? err
 function M.preview()
@@ -61,12 +76,9 @@ function M.preview()
     local _, skill = hover.skill_at(s, row - 1, col)
     contents = skill and require("vergil.skills").contents(skill, s.root)
   end
-  if not contents or (ref and ref.git) then
-    local git = require("vergil.git")
-    local obj = git.object_at(s, row - 1, col)
-    contents = obj and git.object_hover(s.root, obj) or contents
-  end
-  if not contents then
+  local git = require("vergil.git")
+  local candidate = not contents and ref and git.candidate_at(s, row - 1, col)
+  if not contents and not candidate then
     return false, "no reference under the cursor"
   end
   -- Pressing it again with the preview open: close it, or move into it.
@@ -79,13 +91,33 @@ function M.preview()
     vim.api.nvim_win_close(open_win, true)
     return true
   end
-  vim.lsp.util.open_floating_preview(contents, "markdown", { border = "rounded", focus_id = "vergil-preview" })
+  local function show(lines)
+    vim.lsp.util.open_floating_preview(lines, "markdown", { border = "rounded", focus_id = "vergil-preview" })
+  end
+  if contents then
+    show(contents)
+    return true
+  end
+  local here = still_here()
+  git.object(s.root, candidate.path, function(obj)
+    if not here() then
+      return
+    elseif not obj then
+      return warn("no reference under the cursor")
+    end
+    git.object_hover(s.root, obj, function(lines)
+      if here() then
+        show(lines)
+      end
+    end)
+  end)
   return true
 end
 
 local OPEN_CMDS = { split = "split", vsplit = "vsplit", tab = "tabedit" }
 
---- Opens the target of the reference under the cursor at its line.
+--- Opens the target of the reference under the cursor at its line. Commits
+--- and branches need git, so they open once git answers.
 ---@param how? "split"|"vsplit"|"tab" nil opens in the current window
 ---@return boolean ok
 ---@return string? err
@@ -103,16 +135,28 @@ function M.open(how)
     local _, skill = require("vergil.lsp.hover").skill_at(s, row - 1, col)
     if not (skill and skill.path) then
       local git = require("vergil.git")
-      local obj = git.object_at(s, row - 1, col)
-      if not obj then
+      local candidate = git.candidate_at(s, row - 1, col)
+      if not candidate then
         return false, terr
       end
-      s.jump = nil
-      local bufnr = git.object_buffer(s.root, obj)
-      if how then
-        vim.cmd(OPEN_CMDS[how])
-      end
-      vim.api.nvim_win_set_buf(0, bufnr)
+      local here = still_here()
+      git.object(s.root, candidate.path, function(obj)
+        if not here() then
+          return
+        elseif not obj then
+          return warn(terr)
+        end
+        git.object_buffer(s.root, obj, function(bufnr)
+          if not here() then
+            return
+          end
+          s.jump = nil
+          if how then
+            vim.cmd(OPEN_CMDS[how])
+          end
+          vim.api.nvim_win_set_buf(0, bufnr)
+        end)
+      end)
       return true
     end
     target = { abs = skill.path, line = 1, type = "file" }

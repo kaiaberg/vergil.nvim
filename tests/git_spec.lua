@@ -415,11 +415,17 @@ return {
 
     vim.api.nvim_win_set_cursor(0, { 1, #("see `" .. hash .. "` (Second) and `f") })
     h.eq(require("vergil").open(), true)
+    vim.wait(3000, function()
+      return vim.api.nvim_buf_get_name(0) ~= vim.api.nvim_buf_get_name(b)
+    end)
     h.eq(vim.api.nvim_buf_get_name(0), "vergil://git/branch/feature/y")
     h.truthy(table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n"):find("Second", 1, true))
     vim.cmd("buffer " .. b)
     vim.api.nvim_win_set_cursor(0, { 1, 6 })
     h.eq(require("vergil").preview(), true)
+    vim.wait(3000, function()
+      return vim.b[b].lsp_floating_preview ~= nil
+    end)
     local float = vim.b[b].lsp_floating_preview
     h.truthy(float and vim.api.nvim_win_is_valid(float))
     h.truthy(
@@ -429,5 +435,47 @@ return {
     )
     h.eq(require("vergil").preview(), true, "again: closes (preview.on_repeat)")
     h.eq(vim.api.nvim_win_is_valid(float), false)
+  end,
+  ["K and :Vergil preview on a commit don't wait on git"] = function()
+    local top = repo()
+    local hash = git.commits(top)[1].hash
+    local b, client = prompt_in(top, { ("see `%s`"):format(hash) }, "git-slow-hover")
+    local bin = vim.fn.tempname()
+    vim.fn.mkdir(bin, "p")
+    vim.fn.writefile({ "#!/bin/sh", "sleep 1", ('exec "%s" "$@"'):format(vim.fn.exepath("git")) }, bin .. "/git")
+    vim.fn.setfperm(bin .. "/git", "rwxr-xr-x")
+    local path = vim.env.PATH
+    vim.env.PATH = bin .. ":" .. path
+    local ok, err = pcall(function()
+      vim.api.nvim_win_set_cursor(0, { 1, 6 })
+      local t0 = vim.uv.hrtime()
+      h.eq(require("vergil").preview(), true)
+      local ms = (vim.uv.hrtime() - t0) / 1e6
+      h.truthy(ms < 500, ("preview took %d ms"):format(ms))
+      h.eq(vim.b[b].lsp_floating_preview, nil, "not open yet")
+      vim.wait(6000, function()
+        return vim.b[b].lsp_floating_preview ~= nil
+      end)
+      h.truthy(vim.b[b].lsp_floating_preview, "opens once git answers")
+      vim.api.nvim_win_close(vim.b[b].lsp_floating_preview, true)
+      -- The editor stays responsive while K waits: the request answers later.
+      local answered
+      t0 = vim.uv.hrtime()
+      client:request("textDocument/hover", {
+        textDocument = { uri = vim.uri_from_bufnr(b) },
+        position = { line = 0, character = 6 },
+      }, function(_, res)
+        answered = res
+      end, b)
+      ms = (vim.uv.hrtime() - t0) / 1e6
+      h.truthy(ms < 500, ("request took %d ms"):format(ms))
+      vim.wait(6000, function()
+        return answered ~= nil
+      end)
+      h.truthy(answered and answered.contents.value:find("· commit ·", 1, true), vim.inspect(answered))
+    end)
+    vim.env.PATH = path
+    vim.api.nvim_buf_delete(b, { force = true })
+    assert(ok, err)
   end,
 }

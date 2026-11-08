@@ -170,23 +170,7 @@ function M.skill_hover(session, row, col)
   }
 end
 
---- `textDocument/hover` result for a position, or nil.
----@param params table LSP HoverParams
----@param session vergil.Session
-function M.handle(params, session)
-  local row, col = params.position.line, params.position.character
-  local ref = parser.at(parser.parse_buffer(session.bufnr), row, col)
-  if not ref then
-    return M.skill_hover(session, row, col)
-  end
-  local contents = M.contents(ref, session.root)
-  if not contents or ref.git then
-    local obj = require("vergil.git").object_at(session, row, col)
-    if not obj then
-      return nil
-    end
-    contents = require("vergil.git").object_hover(session.root, obj)
-  end
+local function result(ref, contents)
   local s = ref.span
   return {
     contents = { kind = "markdown", value = table.concat(contents, "\n") },
@@ -195,6 +179,32 @@ function M.handle(params, session)
       ["end"] = { line = s.end_row, character = s.end_col },
     },
   }
+end
+
+--- Answers `textDocument/hover` for a position through `respond`: at once
+--- for files and skills, after asking git for commits and branches.
+---@param params table LSP HoverParams
+---@param session vergil.Session
+---@param respond fun(result: table?)
+function M.handle(params, session, respond)
+  local row, col = params.position.line, params.position.character
+  local ref = parser.at(parser.parse_buffer(session.bufnr), row, col)
+  if not ref then
+    return respond(M.skill_hover(session, row, col))
+  end
+  local contents = M.contents(ref, session.root)
+  if contents and not ref.git then
+    return respond(result(ref, contents))
+  end
+  local git = require("vergil.git")
+  git.object_at(session, row, col, function(obj)
+    if not obj then
+      return respond(nil)
+    end
+    git.object_hover(session.root, obj, function(lines)
+      respond(result(ref, lines))
+    end)
+  end)
 end
 
 return M
