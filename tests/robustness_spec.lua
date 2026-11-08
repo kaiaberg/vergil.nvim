@@ -33,17 +33,25 @@ return {
     local files = require("vergil.files")
     local orig = files.list
     local waiting
-    files.list = function(_, cb) waiting = cb end -- discovery never finishes on its own
+    files.list = function(_, cb)
+      waiting = cb
+    end -- discovery never finishes on its own
     local result
     local ok, id = client:request("textDocument/completion", {
       textDocument = { uri = vim.uri_from_bufnr(bufnr) },
       position = { line = 0, character = 2 },
-    }, function(err, res) result = { err = err, res = res } end, bufnr)
+    }, function(err, res)
+      result = { err = err, res = res }
+    end, bufnr)
     h.truthy(ok)
     client:cancel_request(id)
-    vim.wait(500, function() return result ~= nil end)
+    vim.wait(500, function()
+      return result ~= nil
+    end)
     files.list = orig
-    if waiting then waiting({ "a.ts" }) end -- a late answer must not error
+    if waiting then
+      waiting({ "a.ts" })
+    end -- a late answer must not error
     vim.wait(50)
     h.eq(result and result.err and result.err.code, -32800)
   end,
@@ -51,7 +59,9 @@ return {
     local files = require("vergil.files")
     local root = h.tree({ ["x"] = "" })
     local got = {}
-    files.list(root, function(f) got[#got + 1] = f end)
+    files.list(root, function(f)
+      got[#got + 1] = f
+    end)
     files.invalidate(root)
     vim.wait(300)
     h.eq(got, { {} })
@@ -69,7 +79,12 @@ return {
     complete("@") -- first scan
     local worst = 0
     for _, q in ipairs({ "@f", "@fi", "@file_4", "@pkg1/mod2", "@@file_123" }) do
-      worst = math.max(worst, ms(function() complete(q) end))
+      worst = math.max(
+        worst,
+        ms(function()
+          complete(q)
+        end)
+      )
     end
     require("vergil.files").invalidate(root)
     require("vergil").setup({})
@@ -79,10 +94,16 @@ return {
     local root, listing = big_repo(20000)
     require("vergil").setup({ root = root, files = { command = { "sh", "-c", "sleep 0.3; cat " .. listing } } })
     local done = false
-    local t = ms(function() require("vergil.files").list(root, function() done = true end) end)
+    local t = ms(function()
+      require("vergil.files").list(root, function()
+        done = true
+      end)
+    end)
     h.truthy(t < 20 * FACTOR, ("list() blocked for %.1f ms"):format(t))
     h.eq(done, false)
-    vim.wait(3000, function() return done end)
+    vim.wait(3000, function()
+      return done
+    end)
     h.eq(done, true)
     require("vergil.files").invalidate(root)
     require("vergil").setup({})
@@ -93,7 +114,9 @@ return {
       lines[#lines + 1] = ("line %d with @src/f%d.ts and `src/g%d.ts#L1-L2` and prose"):format(i, i, i)
     end
     local refs
-    local t = ms(function() refs = parser.parse(lines, h.opts()) end)
+    local t = ms(function()
+      refs = parser.parse(lines, h.opts())
+    end)
     h.eq(#refs, 10000)
     h.truthy(t < 250 * FACTOR, ("parse took %.1f ms"):format(t))
   end,
@@ -110,7 +133,9 @@ return {
     end
     require("vergil.lsp.server").refresh(bufnr)
     vim.wait(200)
-    local codes = vim.tbl_map(function(d) return d.code end, vim.diagnostic.get(bufnr))
+    local codes = vim.tbl_map(function(d)
+      return d.code
+    end, vim.diagnostic.get(bufnr))
     table.sort(codes)
     h.eq(codes, { "missing_attachment", "missing_attachment" })
     vim.uv.fs_chmod(root .. "/secret.txt", 420)
@@ -118,13 +143,22 @@ return {
   ["invalid UTF-8 and very long lines parse without errors"] = function()
     local long = string.rep("word ", 20000) .. "@a.ts"
     local refs = parser.parse({ "bad \255\254 bytes @x.ts", long }, h.opts())
-    h.eq(vim.tbl_map(function(r) return r.path end, refs), { "x.ts", "a.ts" })
+    h.eq(
+      vim.tbl_map(function(r)
+        return r.path
+      end, refs),
+      { "x.ts", "a.ts" }
+    )
   end,
   ["a nonexistent root gives empty results, not errors"] = function()
     local root = vim.fn.tempname() .. "/missing-root"
     local got
-    require("vergil.files").list(root, function(f) got = f end)
-    vim.wait(3000, function() return got ~= nil end)
+    require("vergil.files").list(root, function(f)
+      got = f
+    end)
+    vim.wait(3000, function()
+      return got ~= nil
+    end)
     h.eq(got, {})
     require("vergil.files").invalidate(root)
   end,
@@ -133,7 +167,9 @@ return {
     local bufnr, client = h.prompt(root, { "@a.ts" }, "err")
     local hover = require("vergil.lsp.hover")
     local orig = hover.handle
-    hover.handle = function() error("boom") end
+    hover.handle = function()
+      error("boom")
+    end
     local res = client:request_sync("textDocument/hover", {
       textDocument = { uri = vim.uri_from_bufnr(bufnr) },
       position = { line = 0, character = 2 },
@@ -144,7 +180,10 @@ return {
   end,
   ["an unreadable skills directory doesn't break / completion"] = function()
     local skills = require("vergil.adapters.claude.skills")
-    local home = h.tree({ [".claude/skills/ok/SKILL.md"] = "---\ndescription: fine\n---\n", [".claude/skills/locked/SKILL.md"] = "x" })
+    local home = h.tree({
+      [".claude/skills/ok/SKILL.md"] = "---\ndescription: fine\n---\n",
+      [".claude/skills/locked/SKILL.md"] = "x",
+    })
     vim.uv.fs_chmod(home .. "/.claude/skills/locked", 0)
     local old_home, old_managed = skills.home, skills.managed_dirs
     skills.home, skills.managed_dirs = home, {}
@@ -152,14 +191,21 @@ return {
     skills.home, skills.managed_dirs = old_home, old_managed
     vim.uv.fs_chmod(home .. "/.claude/skills/locked", 493)
     h.truthy(ok, tostring(items))
-    h.truthy(vim.tbl_contains(vim.tbl_map(function(i) return i.name end, items), "ok"))
+    h.truthy(vim.tbl_contains(
+      vim.tbl_map(function(i)
+        return i.name
+      end, items),
+      "ok"
+    ))
   end,
   ["the selector refuses binary and empty files gracefully"] = function()
     local root = h.tree({ ["empty.txt"] = "", ["bin.dat"] = "a\0b" })
     local bufnr = h.prompt(root, { "@empty.txt" }, "err")
     vim.api.nvim_win_set_cursor(0, { 1, 2 })
     h.eq(require("vergil.range").select_at_cursor(), true, "empty files open")
-    vim.wait(500, function() return vim.api.nvim_win_get_config(0).relative ~= "" end)
+    vim.wait(500, function()
+      return vim.api.nvim_win_get_config(0).relative ~= ""
+    end)
     vim.api.nvim_feedkeys("q", "xt", false)
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "@bin.dat" })
     h.eq({ require("vergil.range").select_at_cursor() }, { false, "binary file: bin.dat" })

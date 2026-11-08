@@ -71,7 +71,11 @@ function M.preview()
   end
   -- Pressing it again with the preview open: close it, or move into it.
   local open_win = vim.b.lsp_floating_preview
-  if open_win and vim.api.nvim_win_is_valid(open_win) and require("vergil.config").options.preview.on_repeat == "close" then
+  if
+    open_win
+    and vim.api.nvim_win_is_valid(open_win)
+    and require("vergil.config").options.preview.on_repeat == "close"
+  then
     vim.api.nvim_win_close(open_win, true)
     return true
   end

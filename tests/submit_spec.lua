@@ -7,8 +7,13 @@ local function setup(lines)
   vim.cmd("silent! %bwipeout!")
   local b = h.prompt(root, lines or { "hello @src/a.lua" }, "submit")
   local exits, asked = {}, {}
-  submit.exit = function(cmd) exits[#exits + 1] = cmd end
-  submit.confirm = function(msg) asked[#asked + 1] = msg; return submit._answer end
+  submit.exit = function(cmd)
+    exits[#exits + 1] = cmd
+  end
+  submit.confirm = function(msg)
+    asked[#asked + 1] = msg
+    return submit._answer
+  end
   return b, exits, asked
 end
 
@@ -66,7 +71,9 @@ return {
     local b, exits = setup({ "see @src/a.lua" })
     vim.api.nvim_win_set_cursor(0, { 1, 0 })
     vim.api.nvim_feedkeys(vim.keycode("A#"), "xt", false)
-    vim.wait(1000, function() return vim.api.nvim_win_get_config(0).relative ~= "" end)
+    vim.wait(1000, function()
+      return vim.api.nvim_win_get_config(0).relative ~= ""
+    end)
     h.eq(submit.submit(), true)
     h.eq(on_disk(vim.api.nvim_buf_get_name(b)), { "see @src/a.lua" })
   end,
@@ -87,7 +94,9 @@ return {
     local b = vim.api.nvim_get_current_buf()
     h.truthy(require("vergil.session").is_enabled(b))
     local exits = {}
-    submit.exit = function(cmd) exits[#exits + 1] = cmd end
+    submit.exit = function(cmd)
+      exits[#exits + 1] = cmd
+    end
     vim.api.nvim_buf_set_lines(b, 0, -1, false, { "edited and written" })
     vim.cmd("silent write")
     require("vergil").disable(b) -- a re-enable must not take a new copy

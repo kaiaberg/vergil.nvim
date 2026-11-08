@@ -1,7 +1,12 @@
 local h = require("helpers")
 
 local root = h.tree({
-  ["src/a.lua"] = table.concat(vim.tbl_map(function(i) return "line " .. i end, vim.fn.range(1, 30)), "\n") .. "\n",
+  ["src/a.lua"] = table.concat(
+    vim.tbl_map(function(i)
+      return "line " .. i
+    end, vim.fn.range(1, 30)),
+    "\n"
+  ) .. "\n",
   ["src/tick.md"] = "has ``` fences\n",
   ["bin.dat"] = "ab\0cd\n",
   ["dir/x.txt"] = "",
@@ -36,7 +41,10 @@ return {
     h.truthy(value("`src/a.lua#L29-L35`", 3):find("Range ends past the file", 1, true))
   end,
   ["hover range covers the reference"] = function()
-    h.eq(hover("see @src/a.lua.", 6).range, { start = { line = 0, character = 4 }, ["end"] = { line = 0, character = 14 } })
+    h.eq(
+      hover("see @src/a.lua.", 6).range,
+      { start = { line = 0, character = 4 }, ["end"] = { line = 0, character = 14 } }
+    )
   end,
   ["longer fence when the file contains backticks"] = function()
     h.truthy(value("@src/tick.md", 2):find("````markdown\nhas ``` fences\n````", 1, true))

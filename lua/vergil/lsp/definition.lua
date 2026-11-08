@@ -27,7 +27,11 @@ function M.target_at(bufnr, row, col, root)
   if not target.exists then
     return nil, ("not found: %s"):format(target.abs)
   end
-  return { abs = target.abs, line = ref.start_line or (ref.ignored_range and ref.ignored_range[1]) or 1, type = target.type }
+  return {
+    abs = target.abs,
+    line = ref.start_line or (ref.ignored_range and ref.ignored_range[1]) or 1,
+    type = target.type,
+  }
 end
 
 ---@param params table LSP DefinitionParams

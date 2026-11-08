@@ -91,7 +91,9 @@ return {
     vim.api.nvim_buf_set_lines(0, 0, 1, false, { "changed" })
     local warned
     local notify = vim.notify
-    vim.notify = function(msg) warned = msg end
+    vim.notify = function(msg)
+      warned = msg
+    end
     send.send("snippet", 1, 1)
     vim.notify = notify
     h.truthy(vim.tbl_contains(text(b), "changed"), vim.inspect(text(b)))

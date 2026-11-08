@@ -3,7 +3,9 @@ local h = require("helpers")
 local root = h.tree({ ["src/a.lua"] = "local x = 1\n" })
 
 local function floats()
-  return vim.tbl_filter(function(w) return vim.api.nvim_win_get_config(w).relative ~= "" end, vim.api.nvim_list_wins())
+  return vim.tbl_filter(function(w)
+    return vim.api.nvim_win_get_config(w).relative ~= ""
+  end, vim.api.nvim_list_wins())
 end
 
 local function feed(keys)
@@ -18,7 +20,9 @@ local function prompt(preset)
 end
 
 local function wait_float()
-  vim.wait(2000, function() return #floats() > 0 end)
+  vim.wait(2000, function()
+    return #floats() > 0
+  end)
   return #floats()
 end
 
@@ -40,7 +44,9 @@ return {
     vim.lsp.buf.hover()
     h.eq(wait_float(), 1)
     vim.lsp.buf.hover() -- second K focuses the float
-    vim.wait(1000, function() return vim.api.nvim_win_get_config(0).relative ~= "" end)
+    vim.wait(1000, function()
+      return vim.api.nvim_win_get_config(0).relative ~= ""
+    end)
     h.eq(vim.api.nvim_win_get_config(0).relative ~= "", true)
     feed("<Esc>")
     h.eq(#floats(), 0)
@@ -52,7 +58,9 @@ return {
     feed("<Esc>")
     h.eq(vim.api.nvim_get_mode().mode, "n")
     local hit = false
-    vim.keymap.set("n", "<Esc>", function() hit = true end)
+    vim.keymap.set("n", "<Esc>", function()
+      hit = true
+    end)
     feed("<Esc>")
     h.eq(hit, true)
     vim.keymap.del("n", "<Esc>")
@@ -80,7 +88,9 @@ return {
     vim.cmd("silent! tabonly | silent! only")
     local submit = require("vergil.submit")
     local exits = {}
-    submit.exit = function(cmd) exits[#exits + 1] = cmd end
+    submit.exit = function(cmd)
+      exits[#exits + 1] = cmd
+    end
     prompt(true)
     feed("<C-w>f")
     h.eq(#vim.api.nvim_tabpage_list_wins(0), 2)
@@ -91,7 +101,23 @@ return {
     require("vergil").setup({ root = root })
   end,
   ["every <Plug> mapping exists"] = function()
-    for _, name in ipairs({ "snippet", "snippet-both", "range", "toggle", "preview", "open", "open-split", "open-vsplit", "open-tab", "submit", "abort", "pick-attach", "pick-mention", "pick-skills", "close-preview" }) do
+    for _, name in ipairs({
+      "snippet",
+      "snippet-both",
+      "range",
+      "toggle",
+      "preview",
+      "open",
+      "open-split",
+      "open-vsplit",
+      "open-tab",
+      "submit",
+      "abort",
+      "pick-attach",
+      "pick-mention",
+      "pick-skills",
+      "close-preview",
+    }) do
       h.truthy(vim.fn.maparg(("<Plug>(vergil-%s)"):format(name), "n") ~= "", name)
     end
   end,

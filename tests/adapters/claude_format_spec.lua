@@ -2,12 +2,17 @@ local h = require("helpers")
 local f = require("vergil.adapters.claude.format")
 
 local function paths(line)
-  return vim.tbl_map(function(a) return a.path end, f.find_attachments(line))
+  return vim.tbl_map(function(a)
+    return a.path
+  end, f.find_attachments(line))
 end
 
 return {
   ["plain attachment with exact span"] = function()
-    h.eq(f.find_attachments("see @src/a.ts now"), { { start_col = 4, end_col = 13, path = "src/a.ts", quoted = false } })
+    h.eq(
+      f.find_attachments("see @src/a.ts now"),
+      { { start_col = 4, end_col = 13, path = "src/a.ts", quoted = false } }
+    )
   end,
   ["boundary: only line start or whitespace (contract-tested)"] = function()
     h.eq(paths("@a.ts\t@b.ts"), { "a.ts", "b.ts" })
@@ -16,13 +21,22 @@ return {
   ["trailing punctuation is stripped from the span"] = function()
     local a = f.find_attachments("x @a.ts), y")[1]
     h.eq({ a.path, a.end_col }, { "a.ts", 7 })
-    h.eq(paths("@a.ts... @b.ts; @c.ts! @d.ts? @e.ts] @f.ts} @g.ts> @h.ts' @i.ts\" @j.ts`"), { "a.ts", "b.ts", "c.ts", "d.ts", "e.ts", "f.ts", "g.ts", "h.ts", "i.ts", "j.ts" })
+    h.eq(
+      paths("@a.ts... @b.ts; @c.ts! @d.ts? @e.ts] @f.ts} @g.ts> @h.ts' @i.ts\" @j.ts`"),
+      { "a.ts", "b.ts", "c.ts", "d.ts", "e.ts", "f.ts", "g.ts", "h.ts", "i.ts", "j.ts" }
+    )
   end,
   ["quoted path with spaces"] = function()
-    h.eq(f.find_attachments('@"my file.ts" ok'), { { start_col = 0, end_col = 13, path = "my file.ts", quoted = true } })
+    h.eq(
+      f.find_attachments('@"my file.ts" ok'),
+      { { start_col = 0, end_col = 13, path = "my file.ts", quoted = true } }
+    )
   end,
   ["unterminated quote runs to end of line"] = function()
-    h.eq(f.find_attachments('x @"my fi'), { { start_col = 2, end_col = 9, path = "my fi", quoted = true, unterminated = true } })
+    h.eq(
+      f.find_attachments('x @"my fi'),
+      { { start_col = 2, end_col = 9, path = "my fi", quoted = true, unterminated = true } }
+    )
   end,
   ["bare @, @@ and empty quotes are not references"] = function()
     h.eq(paths('@ x @@foo @""'), {})

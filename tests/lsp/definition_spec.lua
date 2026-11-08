@@ -19,7 +19,10 @@ return {
   ["definition points at the mention's first line"] = function()
     local bufnr, client = setup("`src/a.lua#L12-L20`")
     local loc = h.request(client, bufnr, "textDocument/definition", 0, 3)
-    h.eq(loc, { uri = vim.uri_from_fname(root .. "/src/a.lua"), range = { start = { line = 11, character = 0 }, ["end"] = { line = 11, character = 0 } } })
+    h.eq(loc, {
+      uri = vim.uri_from_fname(root .. "/src/a.lua"),
+      range = { start = { line = 11, character = 0 }, ["end"] = { line = 11, character = 0 } },
+    })
   end,
   ["definition of an attachment is line 1; missing targets give nothing"] = function()
     local bufnr, client = setup("@src/a.lua")
@@ -47,12 +50,17 @@ return {
   [":Vergil open reports problems instead of opening"] = function()
     setup("@missing.ts")
     h.eq({ require("vergil").open() }, { false, "not found: " .. root .. "/missing.ts" })
-    h.eq({ require("vergil").open("sideways") }, { false, 'unknown open mode "sideways"; expected split, vsplit or tab' })
+    h.eq(
+      { require("vergil").open("sideways") },
+      { false, 'unknown open mode "sideways"; expected split, vsplit or tab' }
+    )
   end,
   [":Vergil preview opens a float"] = function()
     setup("@src/a.lua")
     h.eq(require("vergil").preview(), true)
-    local floats = vim.tbl_filter(function(w) return vim.api.nvim_win_get_config(w).relative ~= "" end, vim.api.nvim_list_wins())
+    local floats = vim.tbl_filter(function(w)
+      return vim.api.nvim_win_get_config(w).relative ~= ""
+    end, vim.api.nvim_list_wins())
     h.eq(#floats, 1)
     vim.api.nvim_win_close(floats[1], true)
   end,
@@ -61,7 +69,9 @@ return {
     vim.cmd("Vergil disable")
     h.eq(#vim.lsp.get_clients({ bufnr = bufnr, name = "vergil" }), 0)
     vim.cmd("Vergil enable")
-    vim.wait(1000, function() return #vim.lsp.get_clients({ bufnr = bufnr, name = "vergil" }) == 1 end)
+    vim.wait(1000, function()
+      return #vim.lsp.get_clients({ bufnr = bufnr, name = "vergil" }) == 1
+    end)
     h.eq(#vim.lsp.get_clients({ bufnr = bufnr, name = "vergil" }), 1)
   end,
 }

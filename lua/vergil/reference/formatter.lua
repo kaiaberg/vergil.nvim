@@ -62,11 +62,15 @@ function M.compile(fmt)
   end
   local t = type(fmt) == "string" and M.presets[fmt] or fmt
   if type(t) ~= "table" or type(t.single) ~= "string" or type(t.range) ~= "string" then
-    error(("vergil: mention.format must be %s or { single = ..., range = ... }"):format(
-      table.concat(vim.tbl_map(function(k)
-        return ("%q"):format(k)
-      end, vim.tbl_keys(M.presets)), ", ")
-    ), 0)
+    error(
+      ("vergil: mention.format must be %s or { single = ..., range = ... }"):format(table.concat(
+        vim.tbl_map(function(k)
+          return ("%q"):format(k)
+        end, vim.tbl_keys(M.presets)),
+        ", "
+      )),
+      0
+    )
   end
   local single_pat, single_order = to_pattern(t.single, { "path", "start" })
   local range_pat, range_order = to_pattern(t.range, { "path", "start", "end" })
@@ -81,9 +85,11 @@ end
 
 local function fill(tpl, path, s, e)
   -- Function replacements so `%` in paths is never interpreted.
-  return (tpl:gsub("{(%w+)}", function(name)
-    return name == "path" and path or tostring(name == "start" and s or e)
-  end))
+  return (
+    tpl:gsub("{(%w+)}", function(name)
+      return name == "path" and path or tostring(name == "start" and s or e)
+    end)
+  )
 end
 
 --- Mention text including backticks: `` `path` ``, `` `path#L12` `` or `` `path#L12-L35` ``.

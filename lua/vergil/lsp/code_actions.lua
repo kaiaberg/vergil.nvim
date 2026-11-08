@@ -87,7 +87,9 @@ function M.handle(params, session)
             local where = drift.start_line == drift.end_line and ("L%d"):format(drift.start_line)
               or ("L%d-L%d"):format(drift.start_line, drift.end_line)
             local fixes = vim.tbl_filter(function(d)
-              return d.code == "symbol" and d.range.start.line == ref.span.start_row and d.range.start.character == ref.span.start_col
+              return d.code == "symbol"
+                and d.range.start.line == ref.span.start_row
+                and d.range.start.character == ref.span.start_col
             end, params.context and params.context.diagnostics or {})
             actions[#actions + 1] = {
               title = ("Update range to %s"):format(where),
@@ -105,12 +107,20 @@ function M.handle(params, session)
             actions[#actions + 1] = {
               title = "Replace with snippet",
               kind = "refactor.rewrite",
-              command = { title = "Replace with snippet", command = M.commands.snippet, arguments = { pos[1], pos[2], pos[3], "snippet" } },
+              command = {
+                title = "Replace with snippet",
+                command = M.commands.snippet,
+                arguments = { pos[1], pos[2], pos[3], "snippet" },
+              },
             }
             actions[#actions + 1] = {
               title = "Add snippet below",
               kind = "refactor.rewrite",
-              command = { title = "Add snippet below", command = M.commands.snippet, arguments = { pos[1], pos[2], pos[3], "both" } },
+              command = {
+                title = "Add snippet below",
+                command = M.commands.snippet,
+                arguments = { pos[1], pos[2], pos[3], "both" },
+              },
             }
           end
           actions[#actions + 1] = {

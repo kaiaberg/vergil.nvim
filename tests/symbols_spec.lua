@@ -34,7 +34,9 @@ local root = h.tree({
 })
 
 local function names(list)
-  return vim.tbl_map(function(s) return ("%s L%d-L%d"):format(s.name, s.start_line, s.end_line) end, list)
+  return vim.tbl_map(function(s)
+    return ("%s L%d-L%d"):format(s.name, s.start_line, s.end_line)
+  end, list)
 end
 
 local function feed(keys)
@@ -46,7 +48,9 @@ local function text(bufnr)
 end
 
 local function selector_open()
-  vim.wait(1000, function() return vim.api.nvim_win_get_config(0).relative ~= "" end)
+  vim.wait(1000, function()
+    return vim.api.nvim_win_get_config(0).relative ~= ""
+  end)
   return vim.api.nvim_win_get_config(0).relative ~= ""
 end
 
@@ -87,13 +91,17 @@ end
 
 return {
   ["Lua: named, local and assigned functions and table fields; callbacks skipped"] = function()
-    h.eq(names(symbols.list(LUA, "/x/a.lua")), { "helper L3-L5", "M.apply L7-L10", "M.cancel L12-L14", "M.cancel.on_done L13-L13" })
+    h.eq(
+      names(symbols.list(LUA, "/x/a.lua")),
+      { "helper L3-L5", "M.apply L7-L10", "M.cancel L12-L14", "M.cancel.on_done L13-L13" }
+    )
   end,
   ["C: functions through declarators, structs with a body only"] = function()
     h.eq(names(symbols.list(C, "/x/a.c")), { "point L1-L1", "add L3-L5" })
   end,
   ["nested symbols are qualified"] = function()
-    local list = symbols.list({ "local M = {}", "function M.outer()", "  local function inner() end", "end" }, "/x/a.lua")
+    local list =
+      symbols.list({ "local M = {}", "function M.outer()", "  local function inner() end", "end" }, "/x/a.lua")
     h.eq(names(list), { "M.outer L2-L4", "M.outer.inner L3-L3" })
     h.eq(list[2].depth, 1)
   end,
@@ -110,8 +118,15 @@ return {
   ["selector: gO selects a symbol's lines, then Enter adds the name"] = function()
     set_file(LUA)
     local b = trigger("look at @src/a.lua")
-    local shown = picking("M.apply", function() feed("gO") end)
-    h.eq(shown, { "helper              L3-L5", "M.apply             L7-L10", "M.cancel            L12-L14", "  M.cancel.on_done  L13-L13" })
+    local shown = picking("M.apply", function()
+      feed("gO")
+    end)
+    h.eq(shown, {
+      "helper              L3-L5",
+      "M.apply             L7-L10",
+      "M.cancel            L12-L14",
+      "  M.cancel.on_done  L13-L13",
+    })
     h.eq(vim.api.nvim_get_mode().mode, "V", "lines selected")
     feed("<CR>")
     h.eq(text(b), { "look at `src/a.lua#L7-L10` (`M.apply`)" })
@@ -126,13 +141,17 @@ return {
   end,
   ["selector: snippets carry the name in their header"] = function()
     local b = trigger("@src/a.lua", "sym-snip")
-    picking("helper", function() feed("gO") end)
+    picking("helper", function()
+      feed("gO")
+    end)
     feed("gs")
     h.truthy(vim.tbl_contains(text(b), "From `src/a.lua#L3-L5` (`helper`):"), vim.inspect(text(b)))
   end,
   ["selector: cancelling the list keeps the selector open"] = function()
     trigger("@src/a.lua", "sym-cancel")
-    picking(nil, function() feed("gO") end)
+    picking(nil, function()
+      feed("gO")
+    end)
     h.truthy(vim.api.nvim_win_get_config(0).relative ~= "", "still in the selector")
     feed("q")
   end,
@@ -153,7 +172,9 @@ return {
     selector_open()
     local said
     local notify = vim.notify
-    vim.notify = function(msg) said = msg end
+    vim.notify = function(msg)
+      said = msg
+    end
     feed("gO")
     vim.notify = notify
     h.eq(said, "vergil: no treesitter parser for notes.unknownext")
@@ -170,15 +191,23 @@ return {
   ["diagnostics: a moved symbol is flagged, and the range can be updated"] = function()
     set_file(LUA)
     vim.cmd("silent! %bwipeout!")
-    local b, client = h.prompt(root, { "fix `src/a.lua#L7-L10` (`M.apply`) and `src/a.lua#L3-L5` (`helper`)" }, "sym-diag")
+    local b, client =
+      h.prompt(root, { "fix `src/a.lua#L7-L10` (`M.apply`) and `src/a.lua#L3-L5` (`helper`)" }, "sym-diag")
     h.eq(vim.diagnostic.get(b), {}, "matching ranges are fine")
     local moved = vim.list_extend({ "-- a new first line", "" }, LUA)
     set_file(moved)
     require("vergil.lsp.server").refresh(b)
-    vim.wait(2000, function() return #vim.diagnostic.get(b) == 2 end)
+    vim.wait(2000, function()
+      return #vim.diagnostic.get(b) == 2
+    end)
     local d = vim.diagnostic.get(b)
-    table.sort(d, function(x, y) return x.col < y.col end)
-    h.eq({ d[1].code, d[1].message, d[2].message }, { "symbol", "`M.apply` is now at L9-L12.", "`helper` is now at L5-L7." })
+    table.sort(d, function(x, y)
+      return x.col < y.col
+    end)
+    h.eq(
+      { d[1].code, d[1].message, d[2].message },
+      { "symbol", "`M.apply` is now at L9-L12.", "`helper` is now at L5-L7." }
+    )
     h.eq(d[1].severity, vim.diagnostic.severity.WARN)
 
     local params = {
@@ -187,8 +216,15 @@ return {
       context = { diagnostics = { d[1].user_data and d[1].user_data.lsp or d[1] } },
     }
     local actions = client:request_sync("textDocument/codeAction", params, 2000, b).result
-    local update = vim.tbl_filter(function(a) return a.title == "Update range to L9-L12" end, actions)[1]
-    h.truthy(update, vim.inspect(vim.tbl_map(function(a) return a.title end, actions)))
+    local update = vim.tbl_filter(function(a)
+      return a.title == "Update range to L9-L12"
+    end, actions)[1]
+    h.truthy(
+      update,
+      vim.inspect(vim.tbl_map(function(a)
+        return a.title
+      end, actions))
+    )
     h.eq({ update.kind, update.isPreferred }, { "quickfix", true })
     vim.lsp.util.apply_workspace_edit(update.edit, client.offset_encoding)
     h.eq(text(b)[1], "fix `src/a.lua#L9-L12` (`M.apply`) and `src/a.lua#L3-L5` (`helper`)")
@@ -198,7 +234,9 @@ return {
     set_file(LUA)
     vim.cmd("silent! %bwipeout!")
     local b = h.prompt(root, { "`src/a.lua#L1-L2` (`M.gone`) `src/a.lua#L7-L8`" }, "sym-gone")
-    vim.wait(2000, function() return #vim.diagnostic.get(b) > 0 end)
+    vim.wait(2000, function()
+      return #vim.diagnostic.get(b) > 0
+    end)
     local d = vim.diagnostic.get(b)
     h.eq(#d, 1)
     h.eq(d[1].message, "`M.gone` is no longer in src/a.lua.")

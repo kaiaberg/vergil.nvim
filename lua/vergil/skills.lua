@@ -112,7 +112,8 @@ end
 ---@return string[]
 function M.contents(skill, root)
   local trigger = config.options.triggers.skills
-  local out = { ("**%s%s**%s"):format(trigger, skill.name, skill.argument_hint and (" `" .. skill.argument_hint .. "`") or "") }
+  local out =
+    { ("**%s%s**%s"):format(trigger, skill.name, skill.argument_hint and (" `" .. skill.argument_hint .. "`") or "") }
   if skill.description then
     out[#out + 1] = ""
     out[#out + 1] = skill.description

@@ -149,7 +149,8 @@ function M.list(lines, abs)
             er = er - 1 -- ends at the start of the next line
           end
           local qualified = (#scope > 0 and not name:find("[.:]")) and (scope[#scope] .. "." .. name) or name
-          out[#out + 1] = { name = qualified, kind = child:type(), start_line = sr + 1, end_line = er + 1, depth = depth }
+          out[#out + 1] =
+            { name = qualified, kind = child:type(), start_line = sr + 1, end_line = er + 1, depth = depth }
           scope[#scope + 1] = qualified
           walk(child, scope, depth + 1)
           scope[#scope] = nil

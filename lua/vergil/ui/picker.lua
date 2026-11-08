@@ -180,27 +180,65 @@ function M.open(opts)
   local preview_buf = wide and opts.preview and scratch() or nil
   local marks_buf = wide and scratch() or nil
   local base = { relative = "editor", style = "minimal", border = "rounded", zindex = 60 }
-  local list_win = vim.api.nvim_open_win(list_buf, false, vim.tbl_extend("force", base, {
-    row = row, col = col, width = list_w, height = list_h, title = " ", title_pos = "left", focusable = false,
-  }))
-  local prompt_win = vim.api.nvim_open_win(prompt_buf, true, vim.tbl_extend("force", base, {
-    row = row + list_h + 2, col = col, width = list_w, height = 1, title = " ", title_pos = "left",
-    footer = " ", footer_pos = "left",
-  }))
+  local list_win = vim.api.nvim_open_win(
+    list_buf,
+    false,
+    vim.tbl_extend("force", base, {
+      row = row,
+      col = col,
+      width = list_w,
+      height = list_h,
+      title = " ",
+      title_pos = "left",
+      focusable = false,
+    })
+  )
+  local prompt_win = vim.api.nvim_open_win(
+    prompt_buf,
+    true,
+    vim.tbl_extend("force", base, {
+      row = row + list_h + 2,
+      col = col,
+      width = list_w,
+      height = 1,
+      title = " ",
+      title_pos = "left",
+      footer = " ",
+      footer_pos = "left",
+    })
+  )
   local preview_win, marks_win
   if preview_buf then
-    preview_win = vim.api.nvim_open_win(preview_buf, false, vim.tbl_extend("force", base, {
-      row = row, col = col + list_w + 2, width = right_w, height = preview_h,
-      title = " Preview ", title_pos = "center", focusable = false,
-    }))
+    preview_win = vim.api.nvim_open_win(
+      preview_buf,
+      false,
+      vim.tbl_extend("force", base, {
+        row = row,
+        col = col + list_w + 2,
+        width = right_w,
+        height = preview_h,
+        title = " Preview ",
+        title_pos = "center",
+        focusable = false,
+      })
+    )
     vim.wo[preview_win].number = true
     vim.wo[preview_win].wrap = false
   end
   if marks_buf then
-    marks_win = vim.api.nvim_open_win(marks_buf, false, vim.tbl_extend("force", base, {
-      row = row + (preview_win and preview_h + 2 or 0), col = col + list_w + 2, width = right_w,
-      height = preview_win and marks_h or height, title = " Marked ", title_pos = "left", focusable = false,
-    }))
+    marks_win = vim.api.nvim_open_win(
+      marks_buf,
+      false,
+      vim.tbl_extend("force", base, {
+        row = row + (preview_win and preview_h + 2 or 0),
+        col = col + list_w + 2,
+        width = right_w,
+        height = preview_win and marks_h or height,
+        title = " Marked ",
+        title_pos = "left",
+        focusable = false,
+      })
+    )
     vim.wo[marks_win].wrap = false
   end
   vim.wo[list_win].cursorline = true
@@ -228,7 +266,8 @@ function M.open(opts)
   local function render_tabs()
     local chunks = { { " ", "FloatBorder" } }
     for i, t in ipairs(opts.tabs) do
-      chunks[#chunks + 1] = { (" %d %s "):format(i, t.name), i == P.tab and "VergilPickerTabActive" or "VergilPickerTab" }
+      chunks[#chunks + 1] =
+        { (" %d %s "):format(i, t.name), i == P.tab and "VergilPickerTabActive" or "VergilPickerTab" }
       chunks[#chunks + 1] = { " ", "FloatBorder" }
     end
     vim.api.nvim_win_set_config(list_win, { title = chunks, title_pos = "left" })
@@ -255,7 +294,13 @@ function M.open(opts)
     for i, h in pairs(hls) do
       vim.api.nvim_buf_set_extmark(marks_buf, ns, i - 1, 0, { end_col = h.sign, hl_group = "VergilPickerMark" })
       if h.label then
-        vim.api.nvim_buf_set_extmark(marks_buf, ns, i - 1, h.label, { end_col = #out[i], hl_group = "VergilPickerLabel" })
+        vim.api.nvim_buf_set_extmark(
+          marks_buf,
+          ns,
+          i - 1,
+          h.label,
+          { end_col = #out[i], hl_group = "VergilPickerLabel" }
+        )
       end
     end
     vim.api.nvim_win_set_config(marks_win, {
@@ -274,7 +319,9 @@ function M.open(opts)
     -- Key hints, fitted to the width: action hints go first, then "mark".
     local prev, next = key_label(keys.prev_tab[1]), key_label(keys.next_tab[1])
     local common = prev:match("^(%a%-)")
-    local tabs_hint = ((common and next:match("^(%a%-)") == common) and (prev .. "/" .. next:sub(#common + 1)) or (prev .. "/" .. next)) .. " tabs"
+    local tabs_hint = (
+      (common and next:match("^(%a%-)") == common) and (prev .. "/" .. next:sub(#common + 1)) or (prev .. "/" .. next)
+    ) .. " tabs"
     local actions = {}
     for _, a in ipairs(opts.actions or {}) do
       if a.desc and a.keys[1] and (not a.when or a.when(tab())) then
@@ -382,12 +429,19 @@ function M.open(opts)
         if byte < h.text_len then
           local stop = vim.str_byteindex(text, "utf-32", pos + 1, false)
           vim.api.nvim_buf_set_extmark(list_buf, ns, i - 1, h.prefix + byte, {
-            end_col = h.prefix + math.min(stop, h.text_len), hl_group = "VergilPickerMatch",
+            end_col = h.prefix + math.min(stop, h.text_len),
+            hl_group = "VergilPickerMatch",
           })
         end
       end
       if h.label_start then
-        vim.api.nvim_buf_set_extmark(list_buf, ns, i - 1, h.label_start, { end_col = #out[i], hl_group = "VergilPickerLabel" })
+        vim.api.nvim_buf_set_extmark(
+          list_buf,
+          ns,
+          i - 1,
+          h.label_start,
+          { end_col = #out[i], hl_group = "VergilPickerLabel" }
+        )
       end
     end
     P.selected = math.max(1, math.min(P.selected, #P.matches))
@@ -420,7 +474,8 @@ function M.open(opts)
   --- Picks up what was typed since the last TextChangedI (which only fires
   --- when typing pauses), so actions always see the current query.
   local function sync()
-    local q = vim.api.nvim_buf_is_valid(prompt_buf) and vim.api.nvim_buf_get_lines(prompt_buf, 0, 1, false)[1] or P.query
+    local q = vim.api.nvim_buf_is_valid(prompt_buf) and vim.api.nvim_buf_get_lines(prompt_buf, 0, 1, false)[1]
+      or P.query
     if q ~= P.query then
       P.query = q
       refilter()
@@ -561,10 +616,22 @@ function M.open(opts)
   local map = function(lhs, fn)
     vim.keymap.set({ "i", "n" }, lhs, fn, { buffer = prompt_buf, nowait = true })
   end
-  for _, lhs in ipairs(keys.confirm) do map(lhs, confirm) end
-  for _, lhs in ipairs(keys.close) do map(lhs, cancel) end
-  for _, lhs in ipairs(keys.down) do map(lhs, function() move(1) end) end
-  for _, lhs in ipairs(keys.up) do map(lhs, function() move(-1) end) end
+  for _, lhs in ipairs(keys.confirm) do
+    map(lhs, confirm)
+  end
+  for _, lhs in ipairs(keys.close) do
+    map(lhs, cancel)
+  end
+  for _, lhs in ipairs(keys.down) do
+    map(lhs, function()
+      move(1)
+    end)
+  end
+  for _, lhs in ipairs(keys.up) do
+    map(lhs, function()
+      move(-1)
+    end)
+  end
   for _, lhs in ipairs(keys.mark) do
     map(lhs, function()
       set_mark()
@@ -579,11 +646,23 @@ function M.open(opts)
       render_list()
     end)
   end
-  for _, lhs in ipairs(keys.next_tab) do map(lhs, function() switch(P.tab + 1) end) end
-  for _, lhs in ipairs(keys.prev_tab) do map(lhs, function() switch(P.tab - 1) end) end
+  for _, lhs in ipairs(keys.next_tab) do
+    map(lhs, function()
+      switch(P.tab + 1)
+    end)
+  end
+  for _, lhs in ipairs(keys.prev_tab) do
+    map(lhs, function()
+      switch(P.tab - 1)
+    end)
+  end
   for i = 1, math.min(9, #opts.tabs) do
-    map(("<M-%d>"):format(i), function() switch(i) end)
-    map(("<C-%d>"):format(i), function() switch(i) end) -- terminals with CSI u
+    map(("<M-%d>"):format(i), function()
+      switch(i)
+    end)
+    map(("<C-%d>"):format(i), function()
+      switch(i)
+    end) -- terminals with CSI u
   end
   local function scroll(dir)
     if preview_win and vim.api.nvim_win_is_valid(preview_win) then
@@ -595,8 +674,16 @@ function M.open(opts)
       end)
     end
   end
-  for _, lhs in ipairs(keys.scroll_down) do map(lhs, function() scroll(1) end) end
-  for _, lhs in ipairs(keys.scroll_up) do map(lhs, function() scroll(-1) end) end
+  for _, lhs in ipairs(keys.scroll_down) do
+    map(lhs, function()
+      scroll(1)
+    end)
+  end
+  for _, lhs in ipairs(keys.scroll_up) do
+    map(lhs, function()
+      scroll(-1)
+    end)
+  end
   for _, a in ipairs(opts.actions or {}) do
     for _, lhs in ipairs(a.keys) do
       map(lhs, function()
@@ -608,7 +695,10 @@ function M.open(opts)
     end
   end
 
-  vim.api.nvim_create_autocmd({ "TextChangedI", "TextChanged", "InsertLeave" }, { buffer = prompt_buf, callback = sync })
+  vim.api.nvim_create_autocmd(
+    { "TextChangedI", "TextChanged", "InsertLeave" },
+    { buffer = prompt_buf, callback = sync }
+  )
   -- Leaving the search line any other way (e.g. a mouse click) cancels.
   vim.api.nvim_create_autocmd("WinLeave", {
     buffer = prompt_buf,

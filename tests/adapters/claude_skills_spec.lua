@@ -3,7 +3,9 @@ local skills = require("vergil.adapters.claude.skills")
 
 local function by_name(list)
   local out = {}
-  for _, it in ipairs(list) do out[it.name] = it end
+  for _, it in ipairs(list) do
+    out[it.name] = it
+  end
   return out
 end
 
@@ -13,14 +15,16 @@ local function with_home(home_files, fn)
   skills.home, skills.managed_dirs = home, {}
   local ok, err = pcall(fn, home)
   skills.home, skills.managed_dirs = old_home, old_managed
-  if not ok then error(err, 0) end
+  if not ok then
+    error(err, 0)
+  end
 end
 
 return {
   ["project skills and commands: names, descriptions, fallbacks"] = function()
     with_home({ ["x"] = "" }, function()
       local root = h.tree({
-        [".claude/skills/review/SKILL.md"] = "---\ndescription: Review code\nargument-hint: \"[file]\"\n---\n",
+        [".claude/skills/review/SKILL.md"] = '---\ndescription: Review code\nargument-hint: "[file]"\n---\n',
         [".claude/skills/dirname/SKILL.md"] = "---\nname: renamed\ndescription: d\n---\n",
         [".claude/skills/nodesc/SKILL.md"] = "---\nname: nodesc\n---\n\n# Heading\n\nbody\n",
         [".claude/commands/plain.md"] = "Plain command. Second sentence.\n",
@@ -28,7 +32,10 @@ return {
         [".claude/skills/broken/SKILL.md"] = "---\n: : :\n---\n",
       })
       local s = by_name(skills.discover(root))
-      h.eq({ s.review.description, s.review.argument_hint, s.review.kind, s.review.origin }, { "Review code", "[file]", "skill", "project" })
+      h.eq(
+        { s.review.description, s.review.argument_hint, s.review.kind, s.review.origin },
+        { "Review code", "[file]", "skill", "project" }
+      )
       h.eq(s.renamed.description, "d")
       h.eq(s.dirname, nil)
       h.eq(s.nodesc.description, "Heading")
@@ -107,7 +114,10 @@ return {
         ["plugins/kit/skills/go/SKILL.md"] = "---\ndescription: go\n---\n",
       })
       vim.fn.mkdir(home .. "/.claude/plugins", "p")
-      vim.fn.writefile({ vim.json.encode({ m = { installLocation = mkt } }) }, home .. "/.claude/plugins/known_marketplaces.json")
+      vim.fn.writefile(
+        { vim.json.encode({ m = { installLocation = mkt } }) },
+        home .. "/.claude/plugins/known_marketplaces.json"
+      )
       vim.fn.writefile({ '{"enabledPlugins": {"kit@m": true}}' }, home .. "/.claude/settings.json")
       h.eq(by_name(skills.discover(h.tree({ x = "" })))["kit:go"].description, "go")
     end)

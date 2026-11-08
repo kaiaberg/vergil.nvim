@@ -31,10 +31,7 @@ end
 ---@return integer[]
 function M.modified_buffers(except)
   return vim.tbl_filter(function(b)
-    return b ~= except
-      and vim.api.nvim_buf_is_loaded(b)
-      and vim.bo[b].buftype == ""
-      and vim.bo[b].modified
+    return b ~= except and vim.api.nvim_buf_is_loaded(b) and vim.bo[b].buftype == "" and vim.bo[b].modified
   end, vim.api.nvim_list_bufs())
 end
 

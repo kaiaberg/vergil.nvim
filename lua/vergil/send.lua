@@ -138,10 +138,7 @@ function M.send(action, line1, line2)
     abs
   )
   if modified then
-    vim.notify(
-      ("vergil: %s has unsaved changes; the agent reads the file on disk"):format(path),
-      vim.log.levels.WARN
-    )
+    vim.notify(("vergil: %s has unsaved changes; the agent reads the file on disk"):format(path), vim.log.levels.WARN)
   end
   return true
 end

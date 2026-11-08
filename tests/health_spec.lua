@@ -47,7 +47,9 @@ return {
     local function text()
       return table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
     end
-    vim.wait(5000, function() return text():find("Prompt safety", 1, true) ~= nil end)
+    vim.wait(5000, function()
+      return text():find("Prompt safety", 1, true) ~= nil
+    end)
     h.truthy(text():find("Prompt safety", 1, true), text())
     vim.cmd("bwipeout!")
   end,
@@ -72,7 +74,14 @@ return {
     h.truthy(same:find("OK vergil's assumptions about Claude Code were checked with this version", 1, true), same)
     local other = with_agent("9.9.9", report)
     -- Informational, not a warning: most agent updates change nothing.
-    h.truthy(other:find("INFO vergil's assumptions about Claude Code were last checked with " .. verified .. "; you have 9.9.9", 1, true), other)
+    h.truthy(
+      other:find(
+        "INFO vergil's assumptions about Claude Code were last checked with " .. verified .. "; you have 9.9.9",
+        1,
+        true
+      ),
+      other
+    )
   end,
   ["says nothing about the agent when it isn't installed"] = function()
     local text = with_agent(nil, report)

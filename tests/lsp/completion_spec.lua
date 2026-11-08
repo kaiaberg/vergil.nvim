@@ -30,7 +30,10 @@ return {
     local res = complete("look at @sess")
     h.eq(res.isIncomplete, true)
     h.eq(res.items[1].label, "src/auth/session.ts")
-    h.eq(res.items[1].textEdit, { range = { start = { line = 0, character = 8 }, ["end"] = { line = 0, character = 13 } }, newText = "@src/auth/session.ts" })
+    h.eq(res.items[1].textEdit, {
+      range = { start = { line = 0, character = 8 }, ["end"] = { line = 0, character = 13 } },
+      newText = "@src/auth/session.ts",
+    })
     h.eq(res.items[1].filterText, "@sess")
     h.eq(res.items[1].labelDetails.description, "10 B")
   end,

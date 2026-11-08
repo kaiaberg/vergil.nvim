@@ -95,7 +95,13 @@ function M.contents(ref, root)
   end
 
   local total = resolver.line_count(target.abs) or 0
-  local header = ("**%s** · %s · %d %s · %s"):format(name, human_size(target.size or 0), total, total == 1 and "line" or "lines", kind)
+  local header = ("**%s** · %s · %d %s · %s"):format(
+    name,
+    human_size(target.size or 0),
+    total,
+    total == 1 and "line" or "lines",
+    kind
+  )
   local first, last = 1, M.preview_lines
   local note
   if ref.start_line then
@@ -184,7 +190,10 @@ function M.handle(params, session)
   local s = ref.span
   return {
     contents = { kind = "markdown", value = table.concat(contents, "\n") },
-    range = { start = { line = s.start_row, character = s.start_col }, ["end"] = { line = s.end_row, character = s.end_col } },
+    range = {
+      start = { line = s.start_row, character = s.start_col },
+      ["end"] = { line = s.end_row, character = s.end_col },
+    },
   }
 end
 

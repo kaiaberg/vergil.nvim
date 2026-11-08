@@ -115,7 +115,12 @@ function M.set(opts)
     local seen = {}
     for _, name in ipairs(opts.picker.tabs or {}) do
       if not known[name] then
-        error(("vergil: unknown picker tab %q; expected all, files, changed, branches, commits or skills"):format(tostring(name)), 0)
+        error(
+          ("vergil: unknown picker tab %q; expected all, files, changed, branches, commits or skills"):format(
+            tostring(name)
+          ),
+          0
+        )
       elseif seen[name] then
         error(("vergil: picker tab %q is listed twice"):format(name), 0)
       end

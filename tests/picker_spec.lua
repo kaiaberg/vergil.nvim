@@ -315,7 +315,12 @@ return {
       local b = prompt("", 0, "pick-home")
       open("attach")
       feed("A~")
-      h.eq(vim.tbl_map(function(l) return l:match("^%s*(%S+)") end, list()), { "~/code/", "~/notes.md" })
+      h.eq(
+        vim.tbl_map(function(l)
+          return l:match("^%s*(%S+)")
+        end, list()),
+        { "~/code/", "~/notes.md" }
+      )
       feed("<CR>")
       h.truthy(ui.current(), "a directory opens instead of closing")
       h.eq(line(ui.current().bufs.prompt), "~/code/")
@@ -356,16 +361,33 @@ return {
   end,
   ["select_for_path inserts a ranged mention at the position"] = function()
     local b = prompt("see ")
-    h.eq(require("vergil.range").select_for_path({ bufnr = b, win = 0, row = 0, col = 4, path = "src/a.lua", from_insert = false }), true)
-    vim.wait(1000, function() return vim.api.nvim_win_get_config(0).relative ~= "" end)
+    h.eq(
+      require("vergil.range").select_for_path({
+        bufnr = b,
+        win = 0,
+        row = 0,
+        col = 4,
+        path = "src/a.lua",
+        from_insert = false,
+      }),
+      true
+    )
+    vim.wait(1000, function()
+      return vim.api.nvim_win_get_config(0).relative ~= ""
+    end)
     feed("2G<CR>")
     h.eq(line(b), "see `src/a.lua#L2`")
   end,
   ["errors"] = function()
     prompt("")
-    h.eq({ picker.pick("nope") }, { false, 'unknown picker "nope"; expected all, attach, mention, skills, changed, branches, commits' })
+    h.eq(
+      { picker.pick("nope") },
+      { false, 'unknown picker "nope"; expected all, attach, mention, skills, changed, branches, commits' }
+    )
     h.eq({ picker.pick("commits") }, { false, "not a git repository" })
-    h.errors(function() require("vergil").setup({ picker = { on_trigger = "yes" } }) end, "picker.on_trigger")
+    h.errors(function()
+      require("vergil").setup({ picker = { on_trigger = "yes" } })
+    end, "picker.on_trigger")
     vim.cmd.enew()
     h.eq({ picker.pick() }, { false, "not enabled in this buffer (use :Vergil enable)" })
   end,
@@ -381,8 +403,24 @@ return {
     h.eq(vim.api.nvim_win_get_config(ui.current().wins.marks).title[1][1], " Marked (2) ")
     feed("Ssrc/")
     local rows = list()
-    h.truthy(vim.tbl_contains(vim.tbl_map(function(l) return l:match("^(.)%s+src/a%.lua") end, rows), "@"), vim.inspect(rows))
-    h.truthy(vim.tbl_contains(vim.tbl_map(function(l) return l:match("^(.)%s+src/b%.lua") end, rows), "`"), vim.inspect(rows))
+    h.truthy(
+      vim.tbl_contains(
+        vim.tbl_map(function(l)
+          return l:match("^(.)%s+src/a%.lua")
+        end, rows),
+        "@"
+      ),
+      vim.inspect(rows)
+    )
+    h.truthy(
+      vim.tbl_contains(
+        vim.tbl_map(function(l)
+          return l:match("^(.)%s+src/b%.lua")
+        end, rows),
+        "`"
+      ),
+      vim.inspect(rows)
+    )
     feed("<CR>")
     h.eq(line(b), "Look: @src/a.lua `src/b.lua`")
   end,
@@ -423,21 +461,38 @@ return {
   ["picker.tabs sets the order and which tabs exist, All included"] = function()
     prompt("", 0, "pick-tabs", { picker = { tabs = { "skills", "all", "files" } } })
     open()
-    h.eq(vim.tbl_map(function(t) return t.name end, ui.current().opts.tabs), { "Skills", "All", "Files" })
+    h.eq(
+      vim.tbl_map(function(t)
+        return t.name
+      end, ui.current().opts.tabs),
+      { "Skills", "All", "Files" }
+    )
     h.eq(tab_name(), "All")
     feed("<Esc>")
     prompt("", 0, "pick-tabs-noskills", { picker = { tabs = { "all", "files" } } })
     open()
-    h.eq(vim.tbl_filter(function(l) return l:match("^%s*/go") end, list()), {}, "no skills in All")
+    h.eq(
+      vim.tbl_filter(function(l)
+        return l:match("^%s*/go")
+      end, list()),
+      {},
+      "no skills in All"
+    )
     feed("<Esc>")
     h.eq({ picker.pick("skills") }, { false, "the skills tab is turned off (picker.tabs)" })
     prompt("", 0, "pick-tabs-noall", { picker = { tabs = { "files", "skills" } } })
     open()
     h.eq(tab_name(), "Files", "no All tab: the first one")
     feed("<Esc>")
-    h.errors(function() require("vergil").setup({ picker = { tabs = { "files", "nope" } } }) end, 'unknown picker tab "nope"')
-    h.errors(function() require("vergil").setup({ picker = { tabs = { "files", "files" } } }) end, "listed twice")
-    h.errors(function() require("vergil").setup({ preview = { on_repeat = "maybe" } }) end, "preview.on_repeat")
+    h.errors(function()
+      require("vergil").setup({ picker = { tabs = { "files", "nope" } } })
+    end, 'unknown picker tab "nope"')
+    h.errors(function()
+      require("vergil").setup({ picker = { tabs = { "files", "files" } } })
+    end, "listed twice")
+    h.errors(function()
+      require("vergil").setup({ preview = { on_repeat = "maybe" } })
+    end, "preview.on_repeat")
     require("vergil").setup({ root = root })
   end,
 }

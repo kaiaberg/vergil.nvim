@@ -1,7 +1,9 @@
 local h = require("helpers")
 
 local src = {}
-for i = 1, 40 do src[#src + 1] = ("line %d"):format(i) end
+for i = 1, 40 do
+  src[#src + 1] = ("line %d"):format(i)
+end
 src[5] = "\tindented `code` here  "
 local root = h.tree({
   ["src/a.lua"] = table.concat(src, "\n") .. "\n",
@@ -14,12 +16,16 @@ local function feed(keys)
 end
 
 local function selector_open()
-  vim.wait(1000, function() return vim.api.nvim_win_get_config(0).relative ~= "" end)
+  vim.wait(1000, function()
+    return vim.api.nvim_win_get_config(0).relative ~= ""
+  end)
   return vim.api.nvim_win_get_config(0).relative ~= ""
 end
 
 local function floats()
-  return #vim.tbl_filter(function(w) return vim.api.nvim_win_get_config(w).relative ~= "" end, vim.api.nvim_list_wins())
+  return #vim.tbl_filter(function(w)
+    return vim.api.nvim_win_get_config(w).relative ~= ""
+  end, vim.api.nvim_list_wins())
 end
 
 --- Types `#` after the reference at the end of `line`, waits for the selector.
@@ -58,7 +64,18 @@ return {
   ["gs alone on a line: the snippet replaces the line, whitespace verbatim"] = function()
     local b = trigger({ "Before", "@src/a.lua", "After" }, 2)
     feed("4GVj" .. "gs")
-    h.eq(text(b), { "Before", "", "From `src/a.lua#L4-L5`:", "", "```lua", "line 4", "\tindented `code` here  ", "```", "", "After" })
+    h.eq(text(b), {
+      "Before",
+      "",
+      "From `src/a.lua#L4-L5`:",
+      "",
+      "```lua",
+      "line 4",
+      "\tindented `code` here  ",
+      "```",
+      "",
+      "After",
+    })
   end,
   ["gs mid-sentence: reference removed, snippet below"] = function()
     local b = trigger({ "it may be related to @src/a.lua" })
@@ -88,13 +105,18 @@ return {
   ["closing the window counts as cancel"] = function()
     local b = trigger({ "@src/a.lua" })
     vim.cmd("close")
-    vim.wait(200, function() return text(b)[1] == "@src/a.lua" end)
+    vim.wait(200, function()
+      return text(b)[1] == "@src/a.lua"
+    end)
     h.eq(text(b), { "@src/a.lua" })
   end,
   ["the selector is a read-only scratch buffer, not the file"] = function()
     trigger({ "@src/a.lua" })
     local sb = vim.api.nvim_get_current_buf()
-    h.eq({ vim.bo[sb].buftype, vim.bo[sb].modifiable, vim.bo[sb].swapfile, vim.bo[sb].filetype }, { "nofile", false, false, "" })
+    h.eq(
+      { vim.bo[sb].buftype, vim.bo[sb].modifiable, vim.bo[sb].swapfile, vim.bo[sb].filetype },
+      { "nofile", false, false, "" }
+    )
     h.eq(vim.fn.bufnr(root .. "/src/a.lua"), -1)
     h.eq(#vim.lsp.get_clients({ bufnr = sb }), 0)
     feed("q")
@@ -146,13 +168,27 @@ return {
     local b = h.prompt(root, { "Before", "`src/a.lua#L4-L5`", "After" }, "snip")
     vim.api.nvim_win_set_cursor(0, { 2, 3 })
     vim.cmd("Vergil snippet")
-    h.eq(text(b), { "Before", "", "From `src/a.lua#L4-L5`:", "", "```lua", "line 4", "\tindented `code` here  ", "```", "", "After" })
+    h.eq(text(b), {
+      "Before",
+      "",
+      "From `src/a.lua#L4-L5`:",
+      "",
+      "```lua",
+      "line 4",
+      "\tindented `code` here  ",
+      "```",
+      "",
+      "After",
+    })
   end,
   [":Vergil snippet both keeps the mention; @file#range becomes a mention"] = function()
     local b = h.prompt(root, { "see @src/a.lua#L2-L3 here" }, "snip")
     vim.api.nvim_win_set_cursor(0, { 1, 6 })
     vim.cmd("Vergil snippet both")
-    h.eq(text(b), { "see `src/a.lua#L2-L3` here", "", "From `src/a.lua#L2-L3`:", "", "```lua", "line 2", "line 3", "```", "" })
+    h.eq(
+      text(b),
+      { "see `src/a.lua#L2-L3` here", "", "From `src/a.lua#L2-L3`:", "", "```lua", "line 2", "line 3", "```", "" }
+    )
   end,
   [":Vergil snippet without a range opens the selector"] = function()
     local b = h.prompt(root, { "@src/a.lua" }, "snip")
@@ -165,8 +201,14 @@ return {
   [":Vergil snippet reports problems"] = function()
     h.prompt(root, { "`src/a.lua#L39-L45`" }, "snip")
     vim.api.nvim_win_set_cursor(0, { 1, 2 })
-    h.eq({ require("vergil.range").snippet_at_cursor() }, { false, "lines 39-45 are past the end of src/a.lua (40 lines)" })
-    h.eq({ require("vergil.range").snippet_at_cursor("sideways") }, { false, 'unknown snippet mode "sideways"; expected both or nothing' })
+    h.eq(
+      { require("vergil.range").snippet_at_cursor() },
+      { false, "lines 39-45 are past the end of src/a.lua (40 lines)" }
+    )
+    h.eq(
+      { require("vergil.range").snippet_at_cursor("sideways") },
+      { false, 'unknown snippet mode "sideways"; expected both or nothing' }
+    )
   end,
   ["keymaps: none by default; the preset maps gs/gb in prompt buffers only"] = function()
     local b = h.prompt(root, { "`src/a.lua#L1`" }, "keys")

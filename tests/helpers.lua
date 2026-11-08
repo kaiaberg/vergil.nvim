@@ -79,7 +79,11 @@ end
 
 --- Sends a request and waits for its result.
 function M.request(client, bufnr, method, row, col, context)
-  local params = { textDocument = { uri = vim.uri_from_bufnr(bufnr) }, position = { line = row, character = col }, context = context }
+  local params = {
+    textDocument = { uri = vim.uri_from_bufnr(bufnr) },
+    position = { line = row, character = col },
+    context = context,
+  }
   local res = client:request_sync(method, params, 3000, bufnr)
   assert(res, method .. " timed out")
   assert(not res.err, vim.inspect(res.err))
@@ -88,7 +92,9 @@ end
 
 --- Labels of a completion result.
 function M.labels(result)
-  return vim.tbl_map(function(i) return i.label end, result.items)
+  return vim.tbl_map(function(i)
+    return i.label
+  end, result.items)
 end
 
 return M

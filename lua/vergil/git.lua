@@ -283,9 +283,11 @@ end
 ---@return string? err
 function M.branches(root, cb)
   local args = {
-    "for-each-ref", "--sort=-committerdate",
+    "for-each-ref",
+    "--sort=-committerdate",
     "--format=%(refname)%1f%(refname:short)%1f%(HEAD)%1f%(upstream:track,nobracket)%1f%(committerdate:relative)%1f%(subject)",
-    "refs/heads", "refs/remotes",
+    "refs/heads",
+    "refs/remotes",
   }
   return either(root, args, M._parse_branches, cb)
 end
@@ -293,10 +295,18 @@ end
 function M._parse_branches(res)
   local out = {}
   for line in (res.stdout or ""):gmatch("[^\n]+") do
-    local ref, name, head, track, date, subject = line:match("^([^\31]*)\31([^\31]*)\31([^\31]*)\31([^\31]*)\31([^\31]*)\31(.*)$")
+    local ref, name, head, track, date, subject =
+      line:match("^([^\31]*)\31([^\31]*)\31([^\31]*)\31([^\31]*)\31([^\31]*)\31(.*)$")
     if ref and not ref:find("/HEAD$") and name ~= "" then
       track = track:gsub("ahead (%d+)", "↑%1"):gsub("behind (%d+)", "↓%1"):gsub(", ", " ")
-      local b = { name = name, current = head == "*", remote = ref:find("^refs/remotes/") ~= nil, track = track, date = date, subject = subject }
+      local b = {
+        name = name,
+        current = head == "*",
+        remote = ref:find("^refs/remotes/") ~= nil,
+        track = track,
+        date = date,
+        subject = subject,
+      }
       if b.current then
         table.insert(out, 1, b)
       else

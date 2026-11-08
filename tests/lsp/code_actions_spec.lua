@@ -6,7 +6,9 @@ local function actions(lines, row, col, with_diags)
   local bufnr, client = h.prompt(root, lines, "ca")
   local diagnostics = {}
   if with_diags then
-    vim.wait(2000, function() return #vim.diagnostic.get(bufnr) > 0 end)
+    vim.wait(2000, function()
+      return #vim.diagnostic.get(bufnr) > 0
+    end)
     for _, d in ipairs(vim.diagnostic.get(bufnr, { lnum = row })) do
       diagnostics[#diagnostics + 1] = d.user_data and d.user_data.lsp or d
     end
@@ -21,7 +23,9 @@ local function actions(lines, row, col, with_diags)
 end
 
 local function titles(list)
-  return vim.tbl_map(function(a) return a.title .. " [" .. a.kind .. "]" end, list)
+  return vim.tbl_map(function(a)
+    return a.title .. " [" .. a.kind .. "]"
+  end, list)
 end
 
 local function apply(action, client)
@@ -59,7 +63,10 @@ return {
   ["running the snippet command replaces the mention"] = function()
     local list, bufnr, client = actions({ "`src/a.ts#L2-L3`" }, 0, 2)
     apply(list[2], client)
-    h.eq(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), { "From `src/a.ts#L2-L3`:", "", "```typescript", "two", "three", "```", "" })
+    h.eq(
+      vim.api.nvim_buf_get_lines(bufnr, 0, -1, false),
+      { "From `src/a.ts#L2-L3`:", "", "```typescript", "two", "three", "```", "" }
+    )
   end,
   ["nothing for prose or ordinary inline code"] = function()
     h.eq(actions({ "call `refresh` now" }, 0, 7), {})

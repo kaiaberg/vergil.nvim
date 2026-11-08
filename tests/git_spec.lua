@@ -2,7 +2,8 @@ local h = require("helpers")
 local git = require("vergil.git")
 
 local function sh(dir, ...)
-  local cmd = { "git", "-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ... }
+  local cmd =
+    { "git", "-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", ... }
   local res = vim.system(cmd, { text = true }):wait()
   assert(res.code == 0, table.concat(cmd, " ") .. ": " .. (res.stderr or ""))
   return res.stdout
@@ -75,19 +76,28 @@ return {
   ["changed files with their status; deleted ones left out"] = function()
     local top = repo()
     local files = assert(git.changed(top))
-    h.eq(vim.tbl_map(function(f) return f.path .. " (" .. f.status .. ")" end, files), {
-      "a.lua (modified)",
-      "c.lua (added, staged)",
-      "f.lua (renamed, staged)",
-      "sub/s.lua (modified)",
-      "sub/d.lua (untracked)",
-    })
+    h.eq(
+      vim.tbl_map(function(f)
+        return f.path .. " (" .. f.status .. ")"
+      end, files),
+      {
+        "a.lua (modified)",
+        "c.lua (added, staged)",
+        "f.lua (renamed, staged)",
+        "sub/s.lua (modified)",
+        "sub/d.lua (untracked)",
+      }
+    )
   end,
   ["paths are relative to the session root, absolute outside it"] = function()
     local top = repo()
-    local paths = vim.tbl_map(function(f) return f.path end, assert(git.changed(top .. "/sub")))
+    local paths = vim.tbl_map(function(f)
+      return f.path
+    end, assert(git.changed(top .. "/sub")))
     h.truthy(contains(paths, "s.lua") and contains(paths, "d.lua"), vim.inspect(paths))
-    local outside = vim.tbl_filter(function(p) return p:match("a%.lua$") end, paths)[1]
+    local outside = vim.tbl_filter(function(p)
+      return p:match("a%.lua$")
+    end, paths)[1]
     h.eq(outside:sub(1, 1), "/", outside)
   end,
   ["outside a repository, or with nothing changed"] = function()
@@ -100,7 +110,9 @@ return {
     h.eq(ok, false)
     h.truthy(perr:find("not a git repository", 1, true), perr)
     open("all")
-    local names = vim.tbl_map(function(t) return t.name end, ui.current().opts.tabs)
+    local names = vim.tbl_map(function(t)
+      return t.name
+    end, ui.current().opts.tabs)
     h.eq(names, { "All", "Files", "Skills" }, "no git tabs outside a repository")
     feed("<Esc>")
     local clean = h.tree({ ["x.lua"] = "x\n" })
@@ -123,7 +135,13 @@ return {
     local list = shown()
     h.truthy(list[1]:match("^  a%.lua%s+modified$"), list[1])
     h.truthy(list[2]:match("^  c%.lua%s+added, staged$"), list[2])
-    h.eq(vim.tbl_filter(function(l) return l:find("claude-prompt", 1, true) end, list), {}, "not the prompt itself")
+    h.eq(
+      vim.tbl_filter(function(l)
+        return l:find("claude-prompt", 1, true)
+      end, list),
+      {},
+      "not the prompt itself"
+    )
     feed("<CR>")
     h.eq(text(b), { "Review @a.lua" })
   end,
@@ -186,13 +204,17 @@ return {
   ["a large diff inserts with a warning"] = function()
     local top = repo()
     local big = {}
-    for i = 1, 3000 do big[i] = ("line %d with some text to make it longer"):format(i) end
+    for i = 1, 3000 do
+      big[i] = ("line %d with some text to make it longer"):format(i)
+    end
     vim.fn.writefile(big, top .. "/a.lua")
     vim.cmd("silent! %bwipeout!")
     h.prompt(top, { "" }, "git-big")
     local warned
     local notify = vim.notify
-    vim.notify = function(msg) warned = msg end
+    vim.notify = function(msg)
+      warned = msg
+    end
     local ok = require("vergil.diff").insert()
     vim.notify = notify
     h.eq(ok, true)
@@ -203,14 +225,21 @@ return {
     sh(top, "add", "-A")
     sh(top, "commit", "-q", "-m", "Use `new` in a.lua")
     local commits = assert(git.commits(top))
-    h.eq(vim.tbl_map(function(c) return c.subject end, commits), { "Use `new` in a.lua", "init" })
+    h.eq(
+      vim.tbl_map(function(c)
+        return c.subject
+      end, commits),
+      { "Use `new` in a.lua", "init" }
+    )
     h.eq(commits[1].author, "t")
     h.truthy(commits[1].hash:match("^%x+$") and #commits[1].hash >= 7, commits[1].hash)
     h.eq(git.reference(commits[1]), ("`%s` (Use 'new' in a.lua)"):format(commits[1].hash))
     h.eq(git.reference({ hash = "abc1234", subject = "" }), "`abc1234`")
     vim.fn.writefile({ "x" }, top .. "/a.lua")
     sh(top, "commit", "-q", "-am", "outside sub")
-    local sub = vim.tbl_map(function(c) return c.subject end, assert(git.commits(top .. "/sub")))
+    local sub = vim.tbl_map(function(c)
+      return c.subject
+    end, assert(git.commits(top .. "/sub")))
     h.eq(sub, { "Use `new` in a.lua", "init" }, "only commits that touched the root")
     h.truthy(table.concat(git.show(top, commits[1].hash), "\n"):find("+new", 1, true))
   end,
@@ -279,16 +308,24 @@ return {
       h.truthy(ms < 500, ("opening took %d ms"):format(ms))
       h.truthy(ui.current(), "open while git runs")
       h.eq(ui.current().tab_spec().items, nil, "still loading")
-      vim.wait(5000, function() return ui.current().tab_spec().items ~= nil end)
+      vim.wait(5000, function()
+        return ui.current().tab_spec().items ~= nil
+      end)
       h.truthy(shown()[1]:match("a%.lua%s+modified$"), shown()[1])
       -- Commit previews load in the background too.
       ui.current().switch(5) -- default tabs: All, Files, Changed, Branches, Commits
-      vim.wait(5000, function() return ui.current().tab_spec().items ~= nil end)
+      vim.wait(5000, function()
+        return ui.current().tab_spec().items ~= nil
+      end)
       h.eq(ui.current().tab_spec().name, "Commits")
       vim.wait(200)
-      local preview = function() return vim.api.nvim_buf_get_lines(ui.current().bufs.preview, 0, 1, false)[1] end
+      local preview = function()
+        return vim.api.nvim_buf_get_lines(ui.current().bufs.preview, 0, 1, false)[1]
+      end
       h.eq(preview(), "Loading…")
-      vim.wait(5000, function() return preview() ~= "Loading…" end)
+      vim.wait(5000, function()
+        return preview() ~= "Loading…"
+      end)
       h.truthy(preview():match("^commit %x+"), preview())
     end)
     vim.env.PATH = path
@@ -302,11 +339,17 @@ return {
     open("changed")
     feed("<Tab>") -- a.lua, the first changed file
     feed("<M-1>")
-    vim.wait(2000, function() return ui.current().tab_spec().items ~= nil end)
-    local row = vim.tbl_filter(function(l) return l:find("a%.lua") end, shown())[1]
+    vim.wait(2000, function()
+      return ui.current().tab_spec().items ~= nil
+    end)
+    local row = vim.tbl_filter(function(l)
+      return l:find("a%.lua")
+    end, shown())[1]
     h.truthy(row:match("^@ a%.lua"), row)
     feed("<M-5>") -- Commits
-    vim.wait(2000, function() return ui.current().tab_spec().items ~= nil end)
+    vim.wait(2000, function()
+      return ui.current().tab_spec().items ~= nil
+    end)
     feed("<Tab>")
     local marks = vim.api.nvim_buf_get_lines(ui.current().bufs.marks, 0, -1, false)
     h.truthy(marks[2]:match("^◆ `%x+` %(init%)%s+commit$"), marks[2])
@@ -345,10 +388,12 @@ return {
     sh(top, "commit", "-q", "-m", "Second")
     sh(top, "branch", "feature/y")
     local hash = git.commits(top)[1].hash
-    local b, client = prompt_in(top, { ("see `%s` (Second) and `feature/y` (branch) and `nothing`"):format(hash) }, "git-hover")
+    local b, client =
+      prompt_in(top, { ("see `%s` (Second) and `feature/y` (branch) and `nothing`"):format(hash) }, "git-hover")
     local function hover(col)
       local res = client:request_sync("textDocument/hover", {
-        textDocument = { uri = vim.uri_from_bufnr(b) }, position = { line = 0, character = col },
+        textDocument = { uri = vim.uri_from_bufnr(b) },
+        position = { line = 0, character = col },
       }, 2000, b)
       return res.result and res.result.contents.value
     end
@@ -360,7 +405,8 @@ return {
     h.eq(vim.diagnostic.get(b), {}, "no diagnostics for commits and branches")
 
     local def = client:request_sync("textDocument/definition", {
-      textDocument = { uri = vim.uri_from_bufnr(b) }, position = { line = 0, character = 6 },
+      textDocument = { uri = vim.uri_from_bufnr(b) },
+      position = { line = 0, character = 6 },
     }, 2000, b).result
     h.truthy(def.uri:match("^vergil://git/commit/%x+$"), def.uri)
     local shown_buf = vim.uri_to_bufnr(def.uri)
@@ -376,7 +422,11 @@ return {
     h.eq(require("vergil").preview(), true)
     local float = vim.b[b].lsp_floating_preview
     h.truthy(float and vim.api.nvim_win_is_valid(float))
-    h.truthy(table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(float), 0, -1, false), "\n"):find("commit", 1, true))
+    h.truthy(
+      table
+        .concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(float), 0, -1, false), "\n")
+        :find("commit", 1, true)
+    )
     h.eq(require("vergil").preview(), true, "again: closes (preview.on_repeat)")
     h.eq(vim.api.nvim_win_is_valid(float), false)
   end,

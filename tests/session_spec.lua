@@ -36,7 +36,12 @@ return {
   end,
   ["enable/disable are idempotent and fire User events"] = function()
     local events = {}
-    local id = vim.api.nvim_create_autocmd("User", { pattern = { "VergilEnable", "VergilDisable" }, callback = function(ev) events[#events + 1] = ev.match end })
+    local id = vim.api.nvim_create_autocmd("User", {
+      pattern = { "VergilEnable", "VergilDisable" },
+      callback = function(ev)
+        events[#events + 1] = ev.match
+      end,
+    })
     local b = edit(vim.fn.tempname() .. "-plain.md")
     vim.cmd("Vergil enable")
     vim.cmd("Vergil enable")
@@ -55,8 +60,12 @@ return {
     h.eq(session.matches("/tmp/claude-prompt-1.md"), true)
   end,
   ["setup validates options"] = function()
-    h.errors(function() require("vergil").setup({ mention = { format = "nope" } }) end, "mention.format")
-    h.errors(function() require("vergil").setup({ root = 1 }) end, "root")
+    h.errors(function()
+      require("vergil").setup({ mention = { format = "nope" } })
+    end, "mention.format")
+    h.errors(function()
+      require("vergil").setup({ root = 1 })
+    end, "root")
     h.eq(config.options.mention.format, "github")
   end,
   ["wiped buffers are forgotten"] = function()
@@ -83,7 +92,20 @@ return {
   end,
   ["command completion"] = function()
     h.eq(require("vergil.commands").complete("t", "Vergil t"), { "toggle" })
-    h.eq(require("vergil.commands").complete("", "Vergil "), { "abort", "diff", "disable", "enable", "open", "pick", "preview", "range", "send", "snippet", "submit", "toggle" })
+    h.eq(require("vergil.commands").complete("", "Vergil "), {
+      "abort",
+      "diff",
+      "disable",
+      "enable",
+      "open",
+      "pick",
+      "preview",
+      "range",
+      "send",
+      "snippet",
+      "submit",
+      "toggle",
+    })
     h.eq(require("vergil.commands").complete("v", "Vergil open v"), { "vsplit" })
   end,
 }

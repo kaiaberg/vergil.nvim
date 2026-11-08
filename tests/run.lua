@@ -3,7 +3,8 @@
 -- Dependency-free on purpose (plan §2). Each spec file returns a table of
 -- name -> function; a test fails if it errors.
 local root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
-package.path = table.concat({ root .. "/lua/?.lua", root .. "/lua/?/init.lua", root .. "/tests/?.lua", package.path }, ";")
+package.path =
+  table.concat({ root .. "/lua/?.lua", root .. "/lua/?/init.lua", root .. "/tests/?.lua", package.path }, ";")
 vim.opt.rtp:prepend(root)
 
 local files = #arg > 0 and arg or vim.fn.glob(root .. "/tests/**/*_spec.lua", false, true)
@@ -14,7 +15,9 @@ for _, file in ipairs(files) do
   table.sort(names)
   local only = vim.env.VERGIL_TEST
   if only and only ~= "" then
-    names = vim.tbl_filter(function(n) return n:find(only) ~= nil end, names)
+    names = vim.tbl_filter(function(n)
+      return n:find(only) ~= nil
+    end, names)
   end
   for _, name in ipairs(names) do
     local ok, err = pcall(specs[name])

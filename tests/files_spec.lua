@@ -4,8 +4,12 @@ local config = require("vergil.config")
 
 local function list_sync(root)
   local got
-  files.list(root, function(f) got = f end)
-  vim.wait(5000, function() return got ~= nil end)
+  files.list(root, function(f)
+    got = f
+  end)
+  vim.wait(5000, function()
+    return got ~= nil
+  end)
   return got
 end
 
@@ -16,11 +20,14 @@ return {
     files.invalidate(root)
   end,
   ["built-in scan skips .git and node_modules"] = function()
-    local root = h.tree({ ["src/a.ts"] = "", ["node_modules/p/i.js"] = "", [".git/config"] = "", ["a/node_modules/x"] = "" })
+    local root =
+      h.tree({ ["src/a.ts"] = "", ["node_modules/p/i.js"] = "", [".git/config"] = "", ["a/node_modules/x"] = "" })
     h.eq(files._builtin_scan(root, 100), { "src/a.ts" })
   end,
   ["git backend respects .gitignore"] = function()
-    if vim.fn.executable("git") ~= 1 then return end
+    if vim.fn.executable("git") ~= 1 then
+      return
+    end
     local root = h.tree({ ["keep.ts"] = "", ["ignored.log"] = "", [".gitignore"] = "*.log\n" })
     vim.system({ "git", "init", "-q" }, { cwd = root }):wait()
     local got = list_sync(root)
@@ -42,7 +49,9 @@ return {
     config.set({})
   end,
   ["a root .gitignore ignores entirely lists nothing, not ignored files"] = function()
-    if vim.fn.executable("git") ~= 1 then return end
+    if vim.fn.executable("git") ~= 1 then
+      return
+    end
     local root = h.tree({ [".env"] = "SECRET=1\n", ["sub/a.lua"] = "", [".gitignore"] = "*\n" })
     vim.system({ "git", "init", "-q" }, { cwd = root }):wait()
     h.eq(list_sync(root), {})
@@ -59,8 +68,14 @@ return {
   ["concurrent requests share one scan and get the same result"] = function()
     local root = h.tree({ ["a"] = "" })
     local results = {}
-    for i = 1, 3 do files.list(root, function(f) results[i] = f end) end
-    vim.wait(5000, function() return #results == 3 end)
+    for i = 1, 3 do
+      files.list(root, function(f)
+        results[i] = f
+      end)
+    end
+    vim.wait(5000, function()
+      return #results == 3
+    end)
     h.eq(results[1], results[2])
     h.eq(results[2], results[3])
     files.invalidate(root)
@@ -76,7 +91,9 @@ return {
   ["invalidate drops the cache and answers waiters"] = function()
     local root = h.tree({ ["a"] = "" })
     local got
-    files.list(root, function(f) got = f end)
+    files.list(root, function(f)
+      got = f
+    end)
     files.invalidate(root)
     h.eq(got, {})
     h.eq(files.cached(root), nil)
@@ -91,7 +108,9 @@ return {
     files.ttl_ms = -1
     h.eq(list_sync(root), { "a" }, "stale result served first")
     files.ttl_ms = ttl
-    vim.wait(5000, function() return #(files.cached(root) or {}) == 2 end)
+    vim.wait(5000, function()
+      return #(files.cached(root) or {}) == 2
+    end)
     h.eq(files.cached(root), { "a", "b" })
     files.invalidate(root)
   end,

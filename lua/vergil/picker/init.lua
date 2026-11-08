@@ -39,8 +39,14 @@ M.separators = {
 }
 
 local TAB_FOR = {
-  all = "all", attach = "files", mention = "files", files = "files", skills = "skills",
-  changed = "changed", branches = "branches", commits = "commits",
+  all = "all",
+  attach = "files",
+  mention = "files",
+  files = "files",
+  skills = "skills",
+  changed = "changed",
+  branches = "branches",
+  commits = "commits",
 }
 
 ---@class vergil.PickContext
@@ -175,11 +181,17 @@ local function build_tabs(session)
   local fetchers = {
     changed = function(cb)
       git.changed(root, function(list, err)
-        cb(list and vim.tbl_filter(function(f) return keep(f.path) end, list), err)
+        cb(list and vim.tbl_filter(function(f)
+          return keep(f.path)
+        end, list), err)
       end)
     end,
-    commits = function(cb) git.commits(root, nil, cb) end,
-    branches = function(cb) git.branches(root, cb) end,
+    commits = function(cb)
+      git.commits(root, nil, cb)
+    end,
+    branches = function(cb)
+      git.branches(root, cb)
+    end,
   }
   --- Calls `cb(value, err)` once the source is in (right away if it is).
   local function source(name, cb)
@@ -247,15 +259,34 @@ local function build_tabs(session)
   end
   local function commit_items(commits)
     return vim.tbl_map(function(c)
-      return { id = "commit:" .. c.hash, text = c.hash .. "  " .. c.subject, label = ("%s, %s"):format(c.author, c.date), kind = "commits", value = c }
+      return {
+        id = "commit:" .. c.hash,
+        text = c.hash .. "  " .. c.subject,
+        label = ("%s, %s"):format(c.author, c.date),
+        kind = "commits",
+        value = c,
+      }
     end, commits or {})
   end
   local function branch_items(branches)
     return vim.tbl_map(function(b)
-      local label = table.concat(vim.tbl_filter(function(x) return x ~= "" end, {
-        b.current and "checked out" or "", b.track, b.date,
-      }), " · ")
-      return { id = "branch:" .. b.name, text = b.name .. "  " .. b.subject, label = label, kind = "branches", value = b }
+      local label = table.concat(
+        vim.tbl_filter(function(x)
+          return x ~= ""
+        end, {
+          b.current and "checked out" or "",
+          b.track,
+          b.date,
+        }),
+        " · "
+      )
+      return {
+        id = "branch:" .. b.name,
+        text = b.name .. "  " .. b.subject,
+        label = label,
+        kind = "branches",
+        value = b,
+      }
     end, branches or {})
   end
   local function git_tab(name, to_items)
@@ -272,7 +303,13 @@ local function build_tabs(session)
 
   local specs = {
     files = { key = "files", name = "Files", load = file_items },
-    skills = { key = "skills", name = "Skills", load = function(cb) cb(skill_items()) end },
+    skills = {
+      key = "skills",
+      name = "Skills",
+      load = function(cb)
+        cb(skill_items())
+      end,
+    },
   }
   if in_repo then
     specs.changed = { key = "changed", name = "Changed", load = git_tab("changed", changed_items) }
@@ -293,21 +330,32 @@ local function build_tabs(session)
           for _, item in ipairs(list) do
             if not seen[item.id] then
               seen[item.id] = true
-              items[#items + 1] = (label and not item.label) and vim.tbl_extend("force", item, { label = label }) or item
+              items[#items + 1] = (label and not item.label) and vim.tbl_extend("force", item, { label = label })
+                or item
             end
           end
         end
         local function relabel(list, label)
-          return vim.tbl_map(function(i) return vim.tbl_extend("force", i, { label = label }) end, list)
+          return vim.tbl_map(function(i)
+            return vim.tbl_extend("force", i, { label = label })
+          end, list)
         end
         local function got(name)
           return sources[name] and sources[name].value
         end
-        if enabled.changed and in_repo then add(changed_items(got("changed"))) end
-        if enabled.skills then add(skill_items()) end
-        if enabled.branches and in_repo then add(relabel(branch_items(got("branches")), "branch")) end
+        if enabled.changed and in_repo then
+          add(changed_items(got("changed")))
+        end
+        if enabled.skills then
+          add(skill_items())
+        end
+        if enabled.branches and in_repo then
+          add(relabel(branch_items(got("branches")), "branch"))
+        end
         add(to_file_items(files), "file")
-        if enabled.commits and in_repo then add(relabel(commit_items(got("commits")), "commit")) end
+        if enabled.commits and in_repo then
+          add(relabel(commit_items(got("commits")), "commit"))
+        end
         cb(items)
       end
       local function start_git()
@@ -427,7 +475,15 @@ function M.pick(kind, opts)
     insert_col = line:sub(col + 1, col + 1):match("%s") and col + 1 or (word_end and word_end - 1 or #line)
   end
   ---@type vergil.PickContext
-  local ctx = { bufnr = bufnr, win = win, row = row - 1, col = insert_col, root = session.root, from_insert = from_insert, cursor = { row, col } }
+  local ctx = {
+    bufnr = bufnr,
+    win = win,
+    row = row - 1,
+    col = insert_col,
+    root = session.root,
+    from_insert = from_insert,
+    cursor = { row, col },
+  }
   if opts.replace then
     ctx.row, ctx.col, ctx.end_col = opts.replace.row, opts.replace.start_col, opts.replace.end_col
   end
@@ -480,7 +536,9 @@ function M.pick(kind, opts)
     local mode = item.kind == "file" and state.mode or item.kind
     local text = vim.trim(M.text_for(mode, item.value) or "")
     local sign = ({ attach = "@", mention = "`", skills = "/", commits = "◆", branches = "⎇" })[mode] or "•"
-    local label = ({ attach = "attach", mention = "mention", skills = "skill", commits = "commit", branches = "branch" })[mode]
+    local label = (
+      { attach = "attach", mention = "mention", skills = "skill", commits = "commit", branches = "branch" }
+    )[mode]
     return { sign = sign, text = text, label = label, data = { text = text, kind = item.kind } }
   end
 
@@ -550,7 +608,12 @@ function M.pick(kind, opts)
           end
           p.close_windows()
           local ok, err = require("vergil.range").select_for_path({
-            bufnr = ctx.bufnr, win = ctx.win, row = ctx.row, col = ctx.col, path = item.value, from_insert = ctx.from_insert,
+            bufnr = ctx.bufnr,
+            win = ctx.win,
+            row = ctx.row,
+            col = ctx.col,
+            path = item.value,
+            from_insert = ctx.from_insert,
           })
           if not ok then
             vim.notify("vergil: " .. err, vim.log.levels.WARN)
@@ -560,7 +623,9 @@ function M.pick(kind, opts)
       {
         keys = keys.diff,
         desc = "diff",
-        when = function(t) return t.key == "commits" or t.key == "branches" or t.key == "all" end,
+        when = function(t)
+          return t.key == "commits" or t.key == "branches" or t.key == "all"
+        end,
         fn = function(p)
           local item = p.current()
           if not item or (item.kind ~= "commits" and item.kind ~= "branches") then
@@ -656,7 +721,12 @@ function M.expand(at)
     local skill = require("vergil.skills").token_at(line, col)
     if skill then
       -- Up to the name: `token_at` leaves out trailing punctuation.
-      return open("skills", skill.name, skill.start_col, skill.start_col + #config.options.triggers.skills + #skill.name)
+      return open(
+        "skills",
+        skill.name,
+        skill.start_col,
+        skill.start_col + #config.options.triggers.skills + #skill.name
+      )
     end
     local s, e = M.word_at(line, col, stop)
     if s then

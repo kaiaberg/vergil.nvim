@@ -3,7 +3,13 @@ local snippets = require("vergil.snippets")
 
 return {
   ["block: header mention, language and verbatim lines"] = function()
-    local block = snippets.block("src/a.ts", 12, 15, { "if (!token) {", "\tthrow x;  ", "}" }, { mention_format = "github", language = "typescript" })
+    local block = snippets.block(
+      "src/a.ts",
+      12,
+      15,
+      { "if (!token) {", "\tthrow x;  ", "}" },
+      { mention_format = "github", language = "typescript" }
+    )
     h.eq(block, { "From `src/a.ts#L12-L15`:", "", "```typescript", "if (!token) {", "\tthrow x;  ", "}", "```" })
   end,
   ["single line uses the single-line format"] = function()

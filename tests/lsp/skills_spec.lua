@@ -3,7 +3,7 @@ local adapter_skills = require("vergil.adapters.claude.skills")
 
 local home = h.tree({ [".claude/skills/girl-dinner/SKILL.md"] = "---\ndescription: Dinner helper\n---\n" })
 local root = h.tree({
-  [".claude/skills/review-auth/SKILL.md"] = "---\ndescription: Review auth code\nargument-hint: \"[file]\"\n---\nbody\n",
+  [".claude/skills/review-auth/SKILL.md"] = '---\ndescription: Review auth code\nargument-hint: "[file]"\n---\nbody\n',
   [".claude/commands/diffsum.md"] = "---\ndescription: Summarise the diff\n---\n",
   ["src/a.ts"] = "",
 })
@@ -13,7 +13,9 @@ local function with_env(fn)
   adapter_skills.home, adapter_skills.managed_dirs = home, {}
   local ok, err = pcall(fn)
   adapter_skills.home, adapter_skills.managed_dirs = old_home, old_managed
-  if not ok then error(err, 0) end
+  if not ok then
+    error(err, 0)
+  end
 end
 
 local function complete(line, col)
@@ -53,13 +55,31 @@ return {
   end,
   ["extra items from config, without overriding discovered names"] = function()
     with_env(function()
-      require("vergil").setup({ root = root, skills = { extra_items = { { name = "/compact", description = "Summarize" }, { name = "diffsum", description = "ignored" } } } })
+      require("vergil").setup({
+        root = root,
+        skills = {
+          extra_items = {
+            { name = "/compact", description = "Summarize" },
+            { name = "diffsum", description = "ignored" },
+          },
+        },
+      })
       local bufnr, client = h.prompt(root, { "/" }, "skills")
-      require("vergil").setup({ root = root, skills = { extra_items = { { name = "/compact", description = "Summarize" }, { name = "diffsum", description = "ignored" } } } })
+      require("vergil").setup({
+        root = root,
+        skills = {
+          extra_items = {
+            { name = "/compact", description = "Summarize" },
+            { name = "diffsum", description = "ignored" },
+          },
+        },
+      })
       local res = h.request(client, bufnr, "textDocument/completion", 0, 1)
       local labels = h.labels(res)
       h.truthy(vim.tbl_contains(labels, "/compact"))
-      h.eq(#vim.tbl_filter(function(l) return l == "/diffsum" end, labels), 1)
+      h.eq(#vim.tbl_filter(function(l)
+        return l == "/diffsum"
+      end, labels), 1)
       require("vergil").setup({ root = root })
     end)
   end,
@@ -68,7 +88,10 @@ return {
       local bufnr, client = h.prompt(root, { "please /review-auth src/a.ts" }, "skills")
       local hv = h.request(client, bufnr, "textDocument/hover", 0, 10)
       h.truthy(hv.contents.value:find("**/review-auth** `[file]`", 1, true), hv.contents.value)
-      h.truthy(hv.contents.value:find("_project skill_ · `.claude/skills/review-auth/SKILL.md`", 1, true), hv.contents.value)
+      h.truthy(
+        hv.contents.value:find("_project skill_ · `.claude/skills/review-auth/SKILL.md`", 1, true),
+        hv.contents.value
+      )
       h.eq(hv.range.start.character, 7)
       local loc = h.request(client, bufnr, "textDocument/definition", 0, 10)
       h.eq(loc.uri, vim.uri_from_fname(root .. "/.claude/skills/review-auth/SKILL.md"))

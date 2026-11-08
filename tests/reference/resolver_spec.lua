@@ -21,7 +21,9 @@ return {
   end,
   ["resolve reports existence, type and size"] = function()
     local root = h.tree({ ["a.ts"] = "12345", ["dir/x"] = "" })
-    local function res(path, extra) return resolver.resolve(vim.tbl_extend("force", { path = path }, extra or {}), root) end
+    local function res(path, extra)
+      return resolver.resolve(vim.tbl_extend("force", { path = path }, extra or {}), root)
+    end
     local f = res("a.ts")
     h.eq({ f.exists, f.type, f.size, f.rel }, { true, "file", 5, "a.ts" })
     local d = res("dir/")

@@ -82,17 +82,54 @@ function M.define_plugs()
     return require("vergil.range")
   end
   local plugs = {
-    ["snippet"] = { act(function() return range().snippet_at_cursor("snippet") end), "replace reference with its lines" },
-    ["snippet-both"] = { act(function() return range().snippet_at_cursor("both") end), "add the reference's lines below" },
-    ["range"] = { act(function() return range().select_at_cursor() end), "select lines for the reference" },
-    ["toggle"] = { act(function() return vergil().toggle() end), "convert between attachment and mention" },
-    ["preview"] = { act(function() return vergil().preview() end), "preview the reference" },
-    ["open"] = { act(function() return vergil().open() end, "gf"), "open the reference" },
-    ["open-split"] = { act(function() return vergil().open("split") end, "<C-w>f"), "open the reference in a split" },
-    ["open-vsplit"] = { act(function() return vergil().open("vsplit") end), "open the reference in a vsplit" },
-    ["open-tab"] = { act(function() return vergil().open("tab") end, "<C-w>gf"), "open the reference in a tab" },
-    ["submit"] = { act(function() return require("vergil.submit").submit() end), "submit the prompt" },
-    ["abort"] = { act(function() return require("vergil.submit").abort() end), "abort and restore the prompt" },
+    ["snippet"] = {
+      act(function()
+        return range().snippet_at_cursor("snippet")
+      end),
+      "replace reference with its lines",
+    },
+    ["snippet-both"] = {
+      act(function()
+        return range().snippet_at_cursor("both")
+      end),
+      "add the reference's lines below",
+    },
+    ["range"] = { act(function()
+      return range().select_at_cursor()
+    end), "select lines for the reference" },
+    ["toggle"] = { act(function()
+      return vergil().toggle()
+    end), "convert between attachment and mention" },
+    ["preview"] = { act(function()
+      return vergil().preview()
+    end), "preview the reference" },
+    ["open"] = { act(function()
+      return vergil().open()
+    end, "gf"), "open the reference" },
+    ["open-split"] = {
+      act(function()
+        return vergil().open("split")
+      end, "<C-w>f"),
+      "open the reference in a split",
+    },
+    ["open-vsplit"] = { act(function()
+      return vergil().open("vsplit")
+    end), "open the reference in a vsplit" },
+    ["open-tab"] = {
+      act(function()
+        return vergil().open("tab")
+      end, "<C-w>gf"),
+      "open the reference in a tab",
+    },
+    ["submit"] = { act(function()
+      return require("vergil.submit").submit()
+    end), "submit the prompt" },
+    ["abort"] = {
+      act(function()
+        return require("vergil.submit").abort()
+      end),
+      "abort and restore the prompt",
+    },
     ["hover"] = {
       function()
         local win = vim.b.lsp_floating_preview
@@ -180,8 +217,17 @@ function M.attach_source(bufnr)
   end
   vim.b[bufnr].vergil_send_keys = true
   local keys = config.options.selector.keys
-  for action, plug in pairs({ mention = "<Plug>(vergil-send)", snippet = "<Plug>(vergil-send-snippet)", both = "<Plug>(vergil-send-both)" }) do
-    vim.keymap.set("x", keys[action], plug, { buffer = bufnr, remap = true, desc = "vergil: send the selection to the prompt (" .. action .. ")" })
+  for action, plug in pairs({
+    mention = "<Plug>(vergil-send)",
+    snippet = "<Plug>(vergil-send-snippet)",
+    both = "<Plug>(vergil-send-both)",
+  }) do
+    vim.keymap.set(
+      "x",
+      keys[action],
+      plug,
+      { buffer = bufnr, remap = true, desc = "vergil: send the selection to the prompt (" .. action .. ")" }
+    )
   end
 end
 

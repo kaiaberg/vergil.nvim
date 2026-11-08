@@ -7,7 +7,9 @@ local function only_window()
 end
 
 local function wins()
-  return #vim.tbl_filter(function(w) return vim.api.nvim_win_get_config(w).relative == "" end, vim.api.nvim_list_wins())
+  return #vim.tbl_filter(function(w)
+    return vim.api.nvim_win_get_config(w).relative == ""
+  end, vim.api.nvim_list_wins())
 end
 
 return {
@@ -43,7 +45,11 @@ return {
     only_window()
     h.prompt(root, { "x" }, "quit")
     local opened = false
-    local id = vim.api.nvim_create_autocmd("WinNew", { callback = function() opened = true end })
+    local id = vim.api.nvim_create_autocmd("WinNew", {
+      callback = function()
+        opened = true
+      end,
+    })
     require("vergil.session").on_quit_pre()
     vim.api.nvim_del_autocmd(id)
     h.eq(opened, false)

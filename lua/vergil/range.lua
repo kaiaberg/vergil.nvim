@@ -212,7 +212,13 @@ local function context_at(bufnr, row, col)
     return nil, err
   end
   local win = vim.fn.bufwinid(bufnr)
-  return { bufnr = bufnr, win = win ~= -1 and win or vim.api.nvim_get_current_win(), ref = ref, span = ref.span, from_insert = false },
+  return {
+    bufnr = bufnr,
+    win = win ~= -1 and win or vim.api.nvim_get_current_win(),
+    ref = ref,
+    span = ref.span,
+    from_insert = false,
+  },
     target
 end
 
@@ -279,7 +285,8 @@ function M.snippet_at(bufnr, row, col, action)
     return false, rerr
   end
   if range[2] > #lines then
-    return false, ("lines %d-%d are past the end of %s (%d lines)"):format(range[1], range[2], target.rel or target.abs, #lines)
+    return false,
+      ("lines %d-%d are past the end of %s (%d lines)"):format(range[1], range[2], target.rel or target.abs, #lines)
   end
   M.apply(ctx, {
     action = action,

@@ -151,7 +151,8 @@ local function build(ranked, token, ctx)
     ["end"] = { line = ctx.row, character = token.end_col },
   }
   for i, path in ipairs(ranked) do
-    local text = token.mode == "mention" and formatter.mention(path, nil, nil, fmt) or formatter.attachment(path, adapter)
+    local text = token.mode == "mention" and formatter.mention(path, nil, nil, fmt)
+      or formatter.attachment(path, adapter)
     if text then
       local st = path:sub(-1) ~= "/" and vim.uv.fs_stat(resolver.absolute(path, ctx.root))
       local detail = st and human_size(st.size) or ""

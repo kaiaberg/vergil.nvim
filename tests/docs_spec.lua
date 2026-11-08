@@ -8,7 +8,16 @@ return {
     vim.fn.writefile(vim.fn.readfile(root .. "/doc/vergil.txt"), tmp .. "/doc/vergil.txt")
     vim.cmd.helptags(tmp .. "/doc")
     vim.opt.rtp:prepend(tmp)
-    for _, tag in ipairs({ "vergil.txt", ":Vergil", ":Vergil-submit", "vergil-#", "vergil-config", "VergilEnable", "vergil-keymap-preset", "vergil.setup()" }) do
+    for _, tag in ipairs({
+      "vergil.txt",
+      ":Vergil",
+      ":Vergil-submit",
+      "vergil-#",
+      "vergil-config",
+      "VergilEnable",
+      "vergil-keymap-preset",
+      "vergil.setup()",
+    }) do
       vim.cmd.help(tag)
       h.eq(vim.bo.filetype, "help", tag)
       vim.cmd.helpclose()
@@ -17,7 +26,9 @@ return {
   ["every |link| in the help file resolves"] = function()
     local text = table.concat(vim.fn.readfile(root .. "/doc/vergil.txt"), "\n")
     local defined = {}
-    for tag in text:gmatch("%*([^%s*]+)%*") do defined[tag] = true end
+    for tag in text:gmatch("%*([^%s*]+)%*") do
+      defined[tag] = true
+    end
     for link in text:gmatch("|([^%s|]+)|") do
       local builtin = vim.fn.taglist("^" .. vim.fn.escape(link, "\\[]*.~^$") .. "$")
       h.truthy(defined[link] or #builtin > 0 or pcall(vim.cmd.help, link), "unresolved |" .. link .. "|")
@@ -26,7 +37,8 @@ return {
   end,
   ["every command and <Plug> mapping is documented"] = function()
     h.load_plugin()
-    local text = table.concat(vim.fn.readfile(root .. "/doc/vergil.txt"), "\n") .. table.concat(vim.fn.readfile(root .. "/README.md"), "\n")
+    local text = table.concat(vim.fn.readfile(root .. "/doc/vergil.txt"), "\n")
+      .. table.concat(vim.fn.readfile(root .. "/README.md"), "\n")
     for _, name in ipairs(require("vergil.commands").names()) do
       h.truthy(text:find(":Vergil " .. name, 1, true), ":Vergil " .. name .. " undocumented")
     end

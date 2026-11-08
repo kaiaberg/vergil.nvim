@@ -6,7 +6,9 @@ local function parse(text, fmt)
 end
 
 local function summary(refs)
-  return vim.tbl_map(function(r) return r.mode .. ":" .. r.path end, refs)
+  return vim.tbl_map(function(r)
+    return r.mode .. ":" .. r.path
+  end, refs)
 end
 
 return {
@@ -29,8 +31,14 @@ return {
     h.eq(refs[2].span, { start_row = 4, start_col = 13, end_row = 4, end_col = 42 })
   end,
   ["a name after a ranged mention belongs to it"] = function()
-    h.eq(summary(parse("see `a.lua#L3-L9` (`M.apply`) and `b.lua` (`c.lua`)")), { "mention:a.lua", "mention:b.lua", "mention:c.lua" })
-    h.eq(summary(parse("`a.lua#L3` (`x.lua`) `a.lua#L4` `y.lua`")), { "mention:a.lua", "mention:a.lua", "mention:y.lua" })
+    h.eq(
+      summary(parse("see `a.lua#L3-L9` (`M.apply`) and `b.lua` (`c.lua`)")),
+      { "mention:a.lua", "mention:b.lua", "mention:c.lua" }
+    )
+    h.eq(
+      summary(parse("`a.lua#L3` (`x.lua`) `a.lua#L4` `y.lua`")),
+      { "mention:a.lua", "mention:a.lua", "mention:y.lua" }
+    )
   end,
   ["`name` (branch) is a git branch, not a file"] = function()
     local refs = parse("merge `feature/login` (branch) into `src/a.lua`")
@@ -59,7 +67,12 @@ return {
   ["mentions: explicit vs maybe-inline-code"] = function()
     local refs = parse("`src/a.ts` `a.ts` `README` `x#L2` `foo()` `a = b` `@x.ts` `` `a/b` ``")
     h.eq(summary(refs), { "mention:src/a.ts", "mention:a.ts", "mention:README", "mention:x" })
-    h.eq(vim.tbl_map(function(r) return r.explicit end, refs), { true, true, false, true })
+    h.eq(
+      vim.tbl_map(function(r)
+        return r.explicit
+      end, refs),
+      { true, true, false, true }
+    )
   end,
   ["mention with spaces in the path"] = function()
     h.eq(summary(parse("see `src/my file.ts#L1-L2`")), { "mention:src/my file.ts" })

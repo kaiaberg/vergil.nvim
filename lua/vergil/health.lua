@@ -172,7 +172,7 @@ local function check_agent_version(adapter)
   else
     health.info(
       ("vergil's assumptions about %s were last checked with %s; you have %s. "):format(name, verified, installed)
-        .. "Usually nothing changes; if references or diagnostics look off, see \"Observed behaviour\" in the README."
+        .. 'Usually nothing changes; if references or diagnostics look off, see "Observed behaviour" in the README.'
     )
   end
 end
@@ -187,7 +187,8 @@ local function check_agent()
   health.start("Agent: " .. (adapter.display_name or adapter.name))
   check_agent_version(adapter)
   local visual, editor = vim.env.VISUAL, vim.env.EDITOR
-  local used = (visual and visual ~= "") and ("$VISUAL=" .. visual) or (editor and editor ~= "") and ("$EDITOR=" .. editor)
+  local used = (visual and visual ~= "") and ("$VISUAL=" .. visual)
+    or (editor and editor ~= "") and ("$EDITOR=" .. editor)
   if used then
     health.info("Ctrl+G opens " .. used .. " (Claude Code prefers $VISUAL over $EDITOR)")
   else
