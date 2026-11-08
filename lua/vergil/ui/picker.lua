@@ -103,11 +103,14 @@ function M.current()
   return active
 end
 
-local function scratch()
+--- A scratch buffer with its own filetype, so users can target it with
+--- FileType autocommands (e.g. to turn off indent guides).
+local function scratch(ft)
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].bufhidden = "wipe"
   vim.bo[buf].swapfile = false
   vim.b[buf].completion = false -- blink.cmp
+  vim.bo[buf].filetype = ft
   return buf
 end
 
@@ -176,9 +179,9 @@ function M.open(opts)
   local marks_h = wide and math.max(3, math.min(8, math.floor(height / 3))) or 0
   local preview_h = height - marks_h - 2
 
-  local list_buf, prompt_buf = scratch(), scratch()
-  local preview_buf = wide and opts.preview and scratch() or nil
-  local marks_buf = wide and scratch() or nil
+  local list_buf, prompt_buf = scratch("vergil-picker-list"), scratch("vergil-picker")
+  local preview_buf = wide and opts.preview and scratch("vergil-picker-preview") or nil
+  local marks_buf = wide and scratch("vergil-picker-marks") or nil
   local base = { relative = "editor", style = "minimal", border = require("vergil.ui.float").border(), zindex = 60 }
   local list_win = vim.api.nvim_open_win(
     list_buf,

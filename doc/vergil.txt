@@ -526,6 +526,17 @@ vergil's floats use your 'winborder'. The picker and the line selector put
 titles on their border, so with "none" or "shadow" (no top edge) they use
 "rounded"; so does everything when 'winborder' is empty.
 
+                                                           *vergil-filetypes*
+To change settings in vergil's windows, e.g. turn off indent guides, use
+|FileType| autocommands for these filetypes: `vergil-picker` (the search
+line), `vergil-picker-list`, `vergil-picker-preview`, `vergil-picker-marks`
+and `vergil-selector` (the line selector). >lua
+    vim.api.nvim_create_autocmd("FileType", {
+      pattern = "vergil-*",
+      callback = function() vim.b.miniindentscope_disable = true end,
+    })
+<
+
 ==============================================================================
 13. EVENTS AND API                                                *vergil-api*
 

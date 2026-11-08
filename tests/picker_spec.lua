@@ -513,4 +513,17 @@ return {
     vim.o.winborder = saved
     assert(ok, err)
   end,
+  ["picker buffers have their own filetypes"] = function()
+    prompt("")
+    local p = open()
+    local fts = {}
+    for name, buf in pairs(p.bufs) do
+      fts[name] = vim.bo[buf].filetype
+    end
+    h.eq(fts.prompt, "vergil-picker")
+    h.eq(fts.list, "vergil-picker-list")
+    h.eq(fts.preview, "vergil-picker-preview")
+    h.eq(fts.marks, "vergil-picker-marks")
+    ui.close()
+  end,
 }

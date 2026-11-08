@@ -115,8 +115,9 @@ return {
     local sb = vim.api.nvim_get_current_buf()
     h.eq(
       { vim.bo[sb].buftype, vim.bo[sb].modifiable, vim.bo[sb].swapfile, vim.bo[sb].filetype },
-      { "nofile", false, false, "" }
+      { "nofile", false, false, "vergil-selector" }
     )
+    h.truthy(vim.treesitter.highlighter.active[sb], "still highlighted as Lua")
     h.eq(vim.fn.bufnr(root .. "/src/a.lua"), -1)
     h.eq(#vim.lsp.get_clients({ bufnr = sb }), 0)
     feed("q")

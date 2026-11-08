@@ -513,7 +513,10 @@ The picker's highlight groups link to standard ones and can be overridden:
 `VergilPickerMatch` (Special), `VergilPickerLabel` (Comment) and
 `VergilPickerMark` (Special). Floats use your `'winborder'` (rounded when
 it's unset; the picker and line selector also when it has no top edge, as
-they put titles on it).
+they put titles on it). To change settings in vergil's windows, use
+`FileType` autocommands for `vergil-picker` (the search line),
+`vergil-picker-list`, `vergil-picker-preview`, `vergil-picker-marks` and
+`vergil-selector` (the line selector), or the pattern `vergil-*`.
 
 The `colon` format writes mentions as `` `src/a.ts:12-35` ``. Custom templates
 must start with `{path}`, put a separator after it, and put `{start}` before

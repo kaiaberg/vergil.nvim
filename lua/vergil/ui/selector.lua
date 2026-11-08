@@ -2,9 +2,10 @@
 --- navigated with ordinary Vim motions, search and Visual mode.
 ---
 --- It never loads the real file into a buffer, so no swapfile, no LSP client
---- and no buffer-local mappings leak onto it. Highlighting goes through
---- treesitter or 'syntax' directly instead of 'filetype', which would fire
---- FileType autocommands (and with them `vim.lsp.enable` configs).
+--- and no buffer-local mappings leak onto it. Its filetype is
+--- `vergil-selector`, not the file's, which would start the language's
+--- ftplugins and `vim.lsp.enable` configs; highlighting goes through
+--- treesitter or 'syntax' directly.
 local config = require("vergil.config")
 local float = require("vergil.ui.float")
 
@@ -64,6 +65,7 @@ function M.open(opts)
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, opts.lines)
   vim.bo[bufnr].modifiable = false
   vim.bo[bufnr].modified = false
+  vim.bo[bufnr].filetype = "vergil-selector" -- before highlighting: FileType resets 'syntax'
   highlight(bufnr, opts.abs)
 
   local footer = (" %s mention · %s snippet · %s both · %s symbols · %s cancel "):format(
