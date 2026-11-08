@@ -30,9 +30,9 @@ return {
       defined[tag] = true
     end
     for link in text:gmatch("|([^%s|]+)|") do
-      local builtin = vim.fn.taglist("^" .. vim.fn.escape(link, "\\[]*.~^$") .. "$")
-      h.truthy(defined[link] or #builtin > 0 or pcall(vim.cmd.help, link), "unresolved |" .. link .. "|")
-      pcall(vim.cmd.helpclose)
+      -- An exact help tag: `:help` itself would also accept a partial match.
+      local builtin = vim.tbl_contains(vim.fn.getcompletion(link, "help"), link)
+      h.truthy(defined[link] or builtin, "unresolved |" .. link .. "|")
     end
   end,
   ["every command and <Plug> mapping is documented"] = function()
@@ -41,6 +41,17 @@ return {
       .. table.concat(vim.fn.readfile(root .. "/README.md"), "\n")
     for _, name in ipairs(require("vergil.commands").names()) do
       h.truthy(text:find(":Vergil " .. name, 1, true), ":Vergil " .. name .. " undocumented")
+    end
+    -- Highlight groups: every Vergil* name in the code, besides the events.
+    for _, file in ipairs(vim.fn.globpath(root .. "/lua", "**/*.lua", false, true)) do
+      for group in table.concat(vim.fn.readfile(file), "\n"):gmatch("Vergil%u%w*") do
+        h.truthy(text:find(group, 1, true), group .. " undocumented")
+      end
+    end
+    local help = table.concat(vim.fn.readfile(root .. "/doc/vergil.txt"), "\n")
+    local pick = help:match("%*:Vergil%-pick%*(.-)\n\n")
+    for _, kind in ipairs(require("vergil.picker").kinds) do
+      h.truthy(pick:find("`" .. kind .. "`", 1, true), ":Vergil pick " .. kind .. " undocumented in :help")
     end
     for _, map in ipairs(vim.api.nvim_get_keymap("n")) do
       local plug = map.lhs:match("^<Plug>%((vergil%-[^)]+)%)$")

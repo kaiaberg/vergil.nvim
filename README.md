@@ -423,7 +423,7 @@ will open.
 | `:Vergil snippet [both]` | Replace a ranged reference with its lines (`both`: keep it, add the lines below) |
 | `:Vergil send [snippet\|both]` | Send the cursor line, or a range (`:'<,'>`), of the current file to the prompt as a mention, snippet or both |
 | `:Vergil toggle` | Convert between attachment and mention |
-| `:Vergil pick [all\|attach\|mention\|skills\|changed\|commits]` | Open [the picker](#the-picker) on that tab (default All) |
+| `:Vergil pick [all\|attach\|mention\|changed\|branches\|commits\|skills]` | Open [the picker](#the-picker) on that tab (default All) |
 | `:Vergil diff [staged\|<rev>]` | Insert `git diff` (default: all uncommitted changes) as a fenced `diff` block |
 | `:Vergil submit` | Write the prompt, settle other modified buffers, exit |
 | `:Vergil abort` | Restore the previous prompt and exit |
@@ -507,6 +507,11 @@ require("vergil").setup({
   },
 })
 ```
+
+The picker's highlight groups link to standard ones and can be overridden:
+`VergilPickerTab` (Comment), `VergilPickerTabActive` (PmenuSel),
+`VergilPickerMatch` (Special), `VergilPickerLabel` (Comment) and
+`VergilPickerMark` (Special).
 
 The `colon` format writes mentions as `` `src/a.ts:12-35` ``. Custom templates
 must start with `{path}`, put a separator after it, and put `{start}` before

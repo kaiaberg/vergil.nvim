@@ -325,8 +325,9 @@ prompt from before `Ctrl+G`, even if it was written in between.
 :Vergil preview                                         *:Vergil-preview*
     Preview the reference or skill under the cursor.
 
-:Vergil open [split|vsplit|tab]                            *:Vergil-open*
-    Open the target of the reference or skill under the cursor.
+:Vergil open [{how}]                                       *:Vergil-open*
+    Open the target of the reference or skill under the cursor, in the
+    current window or as {how}: `split`, `vsplit` or `tab`.
 
 :Vergil range                                             *:Vergil-range*
     Select lines for the reference under the cursor.
@@ -344,9 +345,9 @@ prompt from before `Ctrl+G`, even if it was written in between.
 :Vergil toggle                                           *:Vergil-toggle*
     Convert the reference under the cursor between attachment and mention.
 
-:Vergil pick [attach|mention|skills|changed|commits]       *:Vergil-pick*
-    Open |vergil-picker| on a tab: `all` (default), `attach` or `mention`
-    (Files, in that mode), `skills`, `changed`, `commits`.
+:Vergil pick [{tab}]                                       *:Vergil-pick*
+    Open |vergil-picker| on {tab}: `all` (default), `attach` or `mention`
+    (Files, in that mode), `changed`, `branches`, `commits` or `skills`.
     `changed` lists files changed in git (modified, staged, renamed,
     untracked; not deleted) with their status, to attach. `commits` lists
     recent commits that touched the root, with a `git show` preview, and
@@ -508,6 +509,18 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
                         attachment is flagged.
 `diagnostics.severity`  "error", "warn", "info", "hint", or false to turn a
                         check off.
+
+                                                          *vergil-highlights*
+The picker's highlight groups link to standard groups by default. Set them
+in your colorscheme or with |nvim_set_hl()| to change them:
+
+`VergilPickerTab`        Inactive tab names (default: `Comment`).
+`VergilPickerTabActive`  The current tab (default: `PmenuSel`).
+`VergilPickerMatch`      Matched characters in the list (default:
+                         `Special`).
+`VergilPickerLabel`      Labels after an item, e.g. a file's git status
+                         (default: `Comment`).
+`VergilPickerMark`       The sign of a marked item (default: `Special`).
 
 ==============================================================================
 13. EVENTS AND API                                                *vergil-api*
