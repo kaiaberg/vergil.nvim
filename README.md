@@ -518,6 +518,9 @@ they put titles on it). To change settings in vergil's windows, use
 `vergil-picker-list`, `vergil-picker-preview`, `vergil-picker-marks` and
 `vergil-selector` (the line selector), or the pattern `vergil-*`.
 
+`setup()` fails on invalid values or an unknown `agent`, and warns about
+option names it doesn't know, such as a typo like `keymap`.
+
 The `colon` format writes mentions as `` `src/a.ts:12-35` ``. Custom templates
 must start with `{path}`, put a separator after it, and put `{start}` before
 `{end}`.

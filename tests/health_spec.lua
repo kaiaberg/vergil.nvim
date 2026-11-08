@@ -60,6 +60,17 @@ return {
     end
     h.eq(text:find("\nERROR", 1, true), nil, text)
   end,
+  ["warns about unknown options"] = function()
+    local config = require("vergil.config")
+    local notify = vim.notify
+    vim.notify = function() end
+    config.set({ keymap = { preset = true } })
+    vim.notify = notify
+    local text = report()
+    config.set({})
+    h.truthy(text:find("WARN Unknown options: keymap", 1, true), text)
+    h.truthy(text:find("OK Options are valid", 1, true), text)
+  end,
   ["warns about whitespace stripping on save"] = function()
     vim.g.strip_whitespace_on_save = 1
     local text = report()

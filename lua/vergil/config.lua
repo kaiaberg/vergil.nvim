@@ -89,11 +89,58 @@ M.defaults = {
 ---@type vergil.Config
 M.options = vim.deepcopy(M.defaults)
 
+-- Options whose default is nil, so they're missing from `M.defaults`, and
+-- removed ones that `:checkhealth` reports on its own.
+local KNOWN_NIL = {
+  root = true,
+  ["activation.filename_patterns"] = true,
+  ["files.command"] = true,
+  ["picker.backend"] = true,
+}
+
+--- Option names in `opts` that vergil doesn't know, e.g. typos, as dotted
+--- paths. Tables of fixed fields are checked; lists and free-form tables
+--- (`picker.keys`) aren't.
+---@param opts table
+---@return string[]
+function M.unknown(opts)
+  local out = {}
+  local function walk(t, defaults, prefix)
+    for k, v in pairs(t) do
+      local name = prefix .. tostring(k)
+      local d = defaults[k]
+      if d == nil and not KNOWN_NIL[name] then
+        out[#out + 1] = name
+      elseif type(d) == "table" and type(v) == "table" and next(d) and not vim.islist(d) then
+        walk(v, d, name .. ".")
+      end
+    end
+  end
+  walk(opts, M.defaults, "")
+  table.sort(out)
+  return out
+end
+
+--- Agents with an adapter under `lua/vergil/adapters/`.
+---@return string[]
+function M.agents()
+  local out = {}
+  for _, path in ipairs(vim.api.nvim_get_runtime_file("lua/vergil/adapters/*/init.lua", true)) do
+    out[#out + 1] = vim.fn.fnamemodify(path, ":h:t")
+  end
+  table.sort(out)
+  return vim.fn.uniq(out)
+end
+
 ---@param opts table?
-function M.set(opts)
+---@param quiet boolean? don't warn about unknown options (`:checkhealth` lists them)
+function M.set(opts, quiet)
   opts = opts or {}
   vim.validate("opts", opts, "table")
   vim.validate("agent", opts.agent, "string", true)
+  if opts.agent and not vim.tbl_contains(M.agents(), opts.agent) then
+    error(("vergil: unknown agent %q; expected %s"):format(opts.agent, table.concat(M.agents(), ", ")), 0)
+  end
   vim.validate("root", opts.root, "string", true)
   vim.validate("activation", opts.activation, "table", true)
   vim.validate("mention", opts.mention, "table", true)
@@ -102,9 +149,32 @@ function M.set(opts)
   end
   vim.validate("triggers", opts.triggers, "table", true)
   vim.validate("completion", opts.completion, "table", true)
+  if opts.completion then
+    vim.validate("completion.native", opts.completion.native, "boolean", true)
+    vim.validate("completion.reopen_on_backspace", opts.completion.reopen_on_backspace, "boolean", true)
+  end
   vim.validate("files", opts.files, "table", true)
   vim.validate("selector", opts.selector, "table", true)
+  if opts.selector then
+    vim.validate("selector.keys", opts.selector.keys, "table", true)
+    for name, lhs in pairs(opts.selector.keys or {}) do
+      if name == "cancel" then
+        local ok = type(lhs) == "table" and #lhs > 0
+        for _, l in ipairs(type(lhs) == "table" and lhs or {}) do
+          ok = ok and type(l) == "string" and l ~= ""
+        end
+        if not ok then
+          error('vergil: selector.keys.cancel must be a list of keys, e.g. { "q", "<Esc>" }', 0)
+        end
+      elseif type(lhs) ~= "string" or lhs == "" then
+        error(('vergil: selector.keys.%s must be a key, e.g. "<CR>"'):format(tostring(name)), 0)
+      end
+    end
+  end
   vim.validate("keymaps", opts.keymaps, "table", true)
+  if opts.keymaps then
+    vim.validate("keymaps.preset", opts.keymaps.preset, "boolean", true)
+  end
   vim.validate("return_to_prompt", opts.return_to_prompt, "boolean", true)
   vim.validate("picker", opts.picker, "table", true)
   if opts.picker then
@@ -173,6 +243,16 @@ function M.set(opts)
   end
   if opts.activation then
     vim.validate("activation.filename_patterns", opts.activation.filename_patterns, "table", true)
+  end
+  local unknown = not quiet and M.unknown(opts) or {}
+  if #unknown > 0 then
+    vim.notify(
+      ("vergil: unknown option%s %s (see :help vergil-config)"):format(
+        #unknown == 1 and "" or "s",
+        table.concat(unknown, ", ")
+      ),
+      vim.log.levels.WARN
+    )
   end
   local merged = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts)
   -- Validates the format eagerly so a bad template fails at setup, not mid-prompt.

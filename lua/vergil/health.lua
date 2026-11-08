@@ -17,11 +17,15 @@ end
 local function check_config()
   health.start("Configuration")
   local config = require("vergil.config")
-  local ok, err = pcall(config.set, config.options)
+  local ok, err = pcall(config.set, config.options, true)
   if ok then
     health.ok("Options are valid")
   else
     health.error("Invalid options: " .. tostring(err))
+  end
+  local unknown = config.unknown(config.options)
+  if #unknown > 0 then
+    health.warn("Unknown options: " .. table.concat(unknown, ", "), "Check for typos; see :help vergil-config")
   end
   local session = require("vergil.session")
   health.info("Agent: " .. config.options.agent)

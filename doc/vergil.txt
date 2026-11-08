@@ -472,6 +472,10 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
     },
   })
 <
+`setup()` raises an error for invalid values and an unknown `agent`, and
+warns about option names it doesn't know (e.g. a typo like `keymap`);
+|:checkhealth| lists those too.
+
 `root`                  Project root. Default: Neovim's startup directory.
 `activation.filename_patterns`
                         File-name globs that turn vergil on.

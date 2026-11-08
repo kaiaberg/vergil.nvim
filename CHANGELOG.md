@@ -8,6 +8,10 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- `setup()` warns about unknown option names (e.g. `keymap` for
+  `keymaps`), and `:checkhealth vergil` lists them. An unknown `agent` and
+  non-boolean `completion.*` or `keymaps.preset` values, or malformed
+  `selector.keys`, now fail at setup instead of later.
 - The picker's and line selector's buffers have filetypes (`vergil-picker`,
   `vergil-picker-list`, `vergil-picker-preview`, `vergil-picker-marks`,
   `vergil-selector`), so `FileType` autocommands can target them.
