@@ -11,6 +11,9 @@ local float = require("vergil.ui.float")
 
 local M = {}
 
+-- Buffer-local autocmds; they go when the selector's buffer is wiped.
+local group = vim.api.nvim_create_augroup("vergil.selector", { clear = true })
+
 local active_cancel ---@type fun()?
 
 --- Cancels an open selector right away (not on the next tick), e.g. before
@@ -196,6 +199,7 @@ function M.open(opts)
   -- Closing or leaving the window any other way counts as cancelling,
   -- except leaving it for the symbol list.
   vim.api.nvim_create_autocmd({ "WinClosed", "WinLeave" }, {
+    group = group,
     buffer = bufnr,
     callback = function(ev)
       if ev.event == "WinLeave" and picking then

@@ -111,7 +111,7 @@ local function revisions()
   if vim.fn.mode() == "c" then
     cached = { root = root, list = list }
     vim.api.nvim_create_autocmd("CmdlineLeave", {
-      group = vim.api.nvim_create_augroup("vergil_complete", { clear = true }),
+      group = vim.api.nvim_create_augroup("vergil.complete", { clear = true }),
       once = true,
       callback = function()
         cached = nil

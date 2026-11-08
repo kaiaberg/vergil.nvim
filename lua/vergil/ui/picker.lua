@@ -69,6 +69,8 @@ M.limit = 500
 M.preview_min_width = 80
 
 local ns = vim.api.nvim_create_namespace("vergil.picker")
+-- The search line's autocmds are buffer-local and go when it's wiped.
+local group = vim.api.nvim_create_augroup("vergil.picker", { clear = true })
 local active ---@type vergil.PickerState?
 
 local function set_hl()
@@ -700,10 +702,11 @@ function M.open(opts)
 
   vim.api.nvim_create_autocmd(
     { "TextChangedI", "TextChanged", "InsertLeave" },
-    { buffer = prompt_buf, callback = sync }
+    { group = group, buffer = prompt_buf, callback = sync }
   )
   -- Leaving the search line any other way (e.g. a mouse click) cancels.
   vim.api.nvim_create_autocmd("WinLeave", {
+    group = group,
     buffer = prompt_buf,
     once = true,
     callback = function()
