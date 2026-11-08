@@ -36,3 +36,16 @@ jobs:
         env:
           VERGIL_PERF_FACTOR: "3"
         run: make test
+
+  format:
+    name: StyLua
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: JohnnyMorganz/stylua-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: 2.6.0 # keep in step with local `make fmt`
+          args: --check lua/ plugin/ tests/

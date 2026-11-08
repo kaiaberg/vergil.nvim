@@ -19,4 +19,4 @@
 
 ## Continuous integration
 
-- **Tests** (`.github/workflows/tests.yml`) runs `make test` on every push and pull request: Neovim 0.11.7, stable and nightly on Linux. Run it on macOS locally. `VERGIL_PERF_FACTOR=3` loosens the timing limits on the shared runners.
+- **Tests** (`.github/workflows/tests.yml`) runs `make test` on every push and pull request: Neovim 0.11.7, stable and nightly on Linux. Run it on macOS locally. `VERGIL_PERF_FACTOR=3` loosens the timing limits on the shared runners. A second job runs `stylua --check` with the version pinned in the workflow; update it there when you upgrade StyLua locally.
