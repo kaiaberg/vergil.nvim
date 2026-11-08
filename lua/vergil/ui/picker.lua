@@ -179,7 +179,7 @@ function M.open(opts)
   local list_buf, prompt_buf = scratch(), scratch()
   local preview_buf = wide and opts.preview and scratch() or nil
   local marks_buf = wide and scratch() or nil
-  local base = { relative = "editor", style = "minimal", border = "rounded", zindex = 60 }
+  local base = { relative = "editor", style = "minimal", border = require("vergil.ui.float").border(), zindex = 60 }
   local list_win = vim.api.nvim_open_win(
     list_buf,
     false,

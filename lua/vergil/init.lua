@@ -92,7 +92,9 @@ function M.preview()
     return true
   end
   local function show(lines)
-    vim.lsp.util.open_floating_preview(lines, "markdown", { border = "rounded", focus_id = "vergil-preview" })
+    -- No title here, so any 'winborder' works; unset, vergil's default.
+    local border = vim.o.winborder == "" and "rounded" or nil
+    vim.lsp.util.open_floating_preview(lines, "markdown", { border = border, focus_id = "vergil-preview" })
   end
   if contents then
     show(contents)

@@ -495,4 +495,22 @@ return {
     end, "preview.on_repeat")
     require("vergil").setup({ root = root })
   end,
+  ["the picker uses 'winborder', or rounded when it has no top edge"] = function()
+    local function border()
+      local cfg = vim.api.nvim_win_get_config(ui.current().wins.list)
+      return cfg.border and cfg.border[1]
+    end
+    local saved = vim.o.winborder
+    local ok, err = pcall(function()
+      for value, top in pairs({ double = "╔", single = "┌", none = "╭", shadow = "╭", [""] = "╭" }) do
+        vim.o.winborder = value
+        prompt("")
+        open()
+        h.eq(border(), top, ("winborder=%q"):format(value))
+        ui.close()
+      end
+    end)
+    vim.o.winborder = saved
+    assert(ok, err)
+  end,
 }

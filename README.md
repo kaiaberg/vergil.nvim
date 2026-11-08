@@ -511,7 +511,9 @@ require("vergil").setup({
 The picker's highlight groups link to standard ones and can be overridden:
 `VergilPickerTab` (Comment), `VergilPickerTabActive` (PmenuSel),
 `VergilPickerMatch` (Special), `VergilPickerLabel` (Comment) and
-`VergilPickerMark` (Special).
+`VergilPickerMark` (Special). Floats use your `'winborder'` (rounded when
+it's unset; the picker and line selector also when it has no top edge, as
+they put titles on it).
 
 The `colon` format writes mentions as `` `src/a.ts:12-35` ``. Custom templates
 must start with `{path}`, put a separator after it, and put `{start}` before

@@ -61,6 +61,9 @@ All notable changes are documented here. The format follows
 - The picker no longer uses telescope.nvim or `vim.ui.select`, and
   `picker.backend` is gone (`:checkhealth vergil` warns if it's still set).
   `:Vergil pick` without an argument opens the All tab instead of Files.
+- vergil's floats use your `'winborder'` instead of always `rounded`. The
+  picker and line selector keep `rounded` when it has no top edge
+  (`none`, `shadow`), as they put titles on it.
 
 ### Fixed
 

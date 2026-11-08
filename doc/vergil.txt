@@ -522,6 +522,10 @@ in your colorscheme or with |nvim_set_hl()| to change them:
                          (default: `Comment`).
 `VergilPickerMark`       The sign of a marked item (default: `Special`).
 
+vergil's floats use your 'winborder'. The picker and the line selector put
+titles on their border, so with "none" or "shadow" (no top edge) they use
+"rounded"; so does everything when 'winborder' is empty.
+
 ==============================================================================
 13. EVENTS AND API                                                *vergil-api*
 
