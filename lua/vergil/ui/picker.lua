@@ -95,6 +95,10 @@ M.default_keys = {
   unmark = { "<S-Tab>" },
   next_tab = { "<C-Right>", "<C-l>", "<M-l>" },
   prev_tab = { "<C-Left>", "<C-h>", "<M-h>" },
+  -- A key with `%d` is one key per tab (`<M-1>`..); any other key is a
+  -- prefix followed by the tab's digit (`<C-g>2`). `<C-%d>` needs a terminal
+  -- with CSI u.
+  goto_tab = { "<C-g>", "<M-%d>", "<C-%d>" },
   scroll_down = { "<C-f>" },
   scroll_up = { "<C-b>" },
 }
@@ -661,13 +665,26 @@ function M.open(opts)
       switch(P.tab - 1)
     end)
   end
-  for i = 1, math.min(9, #opts.tabs) do
-    map(("<M-%d>"):format(i), function()
-      switch(i)
-    end)
-    map(("<C-%d>"):format(i), function()
-      switch(i)
-    end) -- terminals with CSI u
+  local tab_count = math.min(9, #opts.tabs)
+  for _, lhs in ipairs(keys.goto_tab) do
+    if lhs:find("%d", 1, true) then
+      for i = 1, tab_count do
+        map(lhs:format(i), function()
+          switch(i)
+        end)
+      end
+    else
+      -- Read the digit here rather than mapping `<C-g>1`..: no wait for
+      -- 'timeoutlen', and the prefix alone does nothing. Anything but a
+      -- tab's digit (e.g. <Esc>) cancels.
+      map(lhs, function()
+        local ok, c = pcall(vim.fn.getcharstr)
+        local i = ok and tonumber(c:match("^[1-9]$"))
+        if i and i <= tab_count then
+          switch(i)
+        end
+      end)
+    end
   end
   local function scroll(dir)
     if preview_win and vim.api.nvim_win_is_valid(preview_win) then

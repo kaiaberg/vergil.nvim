@@ -164,7 +164,9 @@ completion (|vergil-completion|). <CR> on a directory opens it; mark it with
   <C-n> <C-p> <Down> <Up>   Move
   <C-Right> <C-l> <M-l>     Next tab
   <C-Left> <C-h> <M-h>      Previous tab
-  <M-1> .. <M-9>            Go to a tab (<C-1>.. where the terminal sends it)
+  <C-g>{1-9}                Go to a tab: <C-g>, then its number
+  <M-1> .. <M-9>            Go to a tab, where the terminal sends these
+                            (<C-1>.. too, with CSI u)
   <C-t>                     Switch between attaching and mentioning files,
                             for the next marks
   <C-o>                     Join several items with spaces, commas, or one
@@ -180,8 +182,11 @@ A mark keeps the attach/mention mode it was marked with. The Marked panel
 under the preview lists the marks in order, with the text each inserts.
 
 `picker.keys` overrides keys: `{ next_tab = { "<C-l>" } }` (names: confirm,
-close, down, up, mark, unmark, next_tab, prev_tab, scroll_down, scroll_up,
-toggle_mode, separator, select_lines, diff).
+close, down, up, mark, unmark, next_tab, prev_tab, goto_tab, scroll_down,
+scroll_up, toggle_mode, separator, select_lines, diff). A `goto_tab` key
+with `%d` is one key per tab; any other is a prefix followed by the tab's
+number. The default is `{ "<C-g>", "<M-%d>", "<C-%d>" }`; `{ "<C-g>" }`
+keeps only the prefix.
 `picker.on_trigger = true` opens the picker on `@` and `/` instead of the
 inline menu.
 

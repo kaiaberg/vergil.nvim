@@ -285,7 +285,8 @@ directory itself, mark it with `<Tab>` first.
 | `<Tab>` / `<S-Tab>` | mark / unmark; a mark shows in every tab |
 | `<C-n>` `<C-p>` `<Down>` `<Up>` | move |
 | `<C-Right>` `<C-l>` `<M-l>` / `<C-Left>` `<C-h>` `<M-h>` | next / previous tab (cycles) |
-| `<M-1>`…`<M-9>` | go to a tab (`<C-1>`… where the terminal sends them) |
+| `<C-g>` then `1`…`9` | go to a tab |
+| `<M-1>`…`<M-9>` | go to a tab, where the terminal sends them (`<C-1>`… too, with CSI u) |
 | `<C-t>` | switch between attaching and mentioning files (for the next marks) |
 | `<C-o>` | join several items with spaces, commas, or one per line |
 | `<C-r>` | select lines of the file |
@@ -303,8 +304,10 @@ each will insert.
 Keys). Change any key with `picker.keys`, e.g.
 `picker = { keys = { next_tab = { "<C-l>" }, toggle_mode = { "<C-y>" } } }`.
 Names: `confirm`, `close`, `down`, `up`, `mark`, `unmark`, `next_tab`,
-`prev_tab`, `scroll_down`, `scroll_up`, `toggle_mode`, `separator`,
-`select_lines`, `diff`.
+`prev_tab`, `goto_tab`, `scroll_down`, `scroll_up`, `toggle_mode`,
+`separator`, `select_lines`, `diff`. A `goto_tab` key with `%d` is one key
+per tab, any other is a prefix followed by the tab's number: the default is
+`{ "<C-g>", "<M-%d>", "<C-%d>" }`, and `{ "<C-g>" }` keeps only the prefix.
 
 `picker.on_trigger = true` opens the picker as soon as you type `@` or `/`
 where a reference can start, instead of the inline menu.
