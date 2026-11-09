@@ -6,6 +6,16 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-09
+
+One picker with tabs, built into vergil, for files, changed files,
+branches, commits and skills; references to commits and branches, with
+`K` and `gd`; and paths outside the project. Behaviour changes: the picker
+no longer uses telescope or `vim.ui.select` (`picker.backend` is gone),
+`:Vergil pick` opens the All tab, floats follow `'winborder'`, and file
+discovery no longer falls back to listing ignored files.
+Verified against Claude Code 2.1.319.
+
 ### Added
 
 - `:Vergil open` respects command modifiers: `:vertical Vergil open split`,
@@ -56,7 +66,6 @@ All notable changes are documented here. The format follows
   instead of splitting it.
 - `picker.on_trigger` opens the picker on `@` and `/` instead of inline
   completion; `picker.keys` overrides its keys.
-
 - `:Vergil pick commits`: recent commits that touched the root, with a
   `git show` preview, inserted as `` `abc1234` (subject) ``; `<C-d>` inserts
   the commit's diff instead, `<Tab>` marks several.
@@ -206,6 +215,7 @@ First release: a Vim-native toolkit for writing Claude Code prompts in the
 
 - The M0 prototype, superseded by the plugin.
 
-[Unreleased]: https://github.com/kaiaberg/vergil.nvim/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kaiaberg/vergil.nvim/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kaiaberg/vergil.nvim/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kaiaberg/vergil.nvim/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kaiaberg/vergil.nvim/releases/tag/v0.1.0
