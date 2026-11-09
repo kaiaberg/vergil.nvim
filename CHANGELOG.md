@@ -23,14 +23,17 @@ All notable changes are documented here. The format follows
   `Enter` on a directory opens it.
 - One picker with tabs, built into vergil: All, Files, Changed, Commits and
   Skills, with fuzzy search, a preview, and cycling tabs
-  (`<C-Right>`/`<C-Left>`, `<C-l>`/`<C-h>`, `<M-l>`/`<M-h>`,
-  `<M-1>`…`<M-9>`). `:Vergil pick [tab]` opens it on a tab (default All).
+  (`<C-Right>`/`<C-Left>`, `<C-l>`/`<C-h>`, `<M-l>`/`<M-h>`).
+  `<C-g>` and a tab's number go straight to that tab, in any terminal;
+  `<M-1>`…`<M-9>` too where the terminal sends them. The footer shows the
+  keys. `:Vergil pick [tab]` opens it on a tab (default All).
 - Marks in the picker show in every tab, with a sign (`@` attach,
   `` ` `` mention, `/` skill, `◆` commit), and each keeps the attach/mention
   mode it was marked with. A Marked panel lists them with the text each
   inserts. `<C-o>` joins them with spaces, commas, or one per line.
 - `picker.keys` customizes every picker key, including `<C-t>`, `<C-o>`,
-  `<C-r>` and `<C-d>`.
+  `<C-r>` and `<C-d>`. `goto_tab` takes prefixes (`"<C-g>"`, then the
+  number) and per-tab patterns (`"<M-%d>"`).
 - `picker.tabs` chooses the picker's tabs and their order; a tab left out is
   gone from All too.
 - A Branches tab: local and remote branches, the checked-out one first,
