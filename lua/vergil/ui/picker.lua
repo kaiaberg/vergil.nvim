@@ -325,12 +325,20 @@ function M.open(opts)
       title = { { (" %s "):format(status), "FloatTitle" }, { marked, "VergilPickerMark" } },
       title_pos = "left",
     })
-    -- Key hints, fitted to the width: action hints go first, then "mark".
+    -- Key hints, fitted to the width: action hints go first, then the
+    -- go-to-tab prefix ("C-g 1-5"), then "mark".
     local prev, next = key_label(keys.prev_tab[1]), key_label(keys.next_tab[1])
     local common = prev:match("^(%a%-)")
-    local tabs_hint = (
-      (common and next:match("^(%a%-)") == common) and (prev .. "/" .. next:sub(#common + 1)) or (prev .. "/" .. next)
-    ) .. " tabs"
+    local cycle = (common and next:match("^(%a%-)") == common) and (prev .. "/" .. next:sub(#common + 1))
+      or (prev .. "/" .. next)
+    local goto_hint = {}
+    local tab_count = math.min(9, #opts.tabs)
+    for _, lhs in ipairs(keys.goto_tab) do
+      if not lhs:find("%d", 1, true) and tab_count > 1 then
+        goto_hint = { ("%s 1-%d"):format(key_label(lhs), tab_count) }
+        break
+      end
+    end
     local actions = {}
     for _, a in ipairs(opts.actions or {}) do
       if a.desc and a.keys[1] and (not a.when or a.when(tab())) then
@@ -342,13 +350,16 @@ function M.open(opts)
       local hints = { "Enter insert" }
       vim.list_extend(hints, mark)
       vim.list_extend(hints, actions)
-      vim.list_extend(hints, { tabs_hint, "Esc close" })
+      hints[#hints + 1] = table.concat(vim.list_extend({ cycle }, goto_hint), ", ") .. " tabs"
+      hints[#hints + 1] = "Esc close"
       return " " .. table.concat(hints, " · ") .. " "
     end
     local footer = build()
-    while vim.fn.strdisplaywidth(footer) > list_w - 2 and (#actions > 0 or #mark > 0) do
+    while vim.fn.strdisplaywidth(footer) > list_w - 2 and (#actions > 0 or #goto_hint > 0 or #mark > 0) do
       if #actions > 0 then
         table.remove(actions)
+      elseif #goto_hint > 0 then
+        goto_hint = {}
       else
         mark = {}
       end
