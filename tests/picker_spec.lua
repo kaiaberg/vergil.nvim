@@ -129,33 +129,35 @@ return {
     h.eq(tab_name(), "Skills")
     feed("<Esc>")
   end,
+  -- Through `ui.footer` rather than a resized screen: setting 'columns' in a
+  -- headless Neovim 0.12 overruns its screen grid and can crash it.
   ["the footer hints the go-to-tab prefix, and drops it when narrow"] = function()
-    local function footer()
-      local f = vim.api.nvim_win_get_config(ui.current().wins.prompt).footer
-      return table.concat(vim.tbl_map(function(c)
-        return c[1]
-      end, f))
-    end
-    local columns = vim.o.columns
-    vim.o.columns = 200
+    local keys = vim.tbl_extend("force", ui.default_keys, {})
+    local actions = { "C-t mention", "C-o join" }
+    local wide = ui.footer(keys, actions, 5, 200)
+    h.eq(wide, " Enter insert · Tab mark · C-t mention · C-o join · C-Left/Right, C-g 1-5 tabs · Esc close ")
+    h.eq(#actions, 2, "the caller's list is left alone")
+    h.truthy(ui.footer(keys, {}, 12, 200):find("C-g 1-9 tabs", 1, true), "at most 9")
+    h.truthy(ui.footer(keys, {}, 1, 200):find("C-Left/Right tabs", 1, true), "one tab: nothing to go to")
+    local nogoto = vim.tbl_extend("force", keys, { goto_tab = { "<M-%d>" } })
+    h.truthy(ui.footer(nogoto, {}, 5, 200):find("C-Left/Right tabs", 1, true), "no prefix")
+    local width = vim.fn.strdisplaywidth(" Enter insert · Tab mark · C-Left/Right, C-g 1-5 tabs · Esc close ")
+    h.eq(
+      ui.footer(keys, actions, 5, width),
+      " Enter insert · Tab mark · C-Left/Right, C-g 1-5 tabs · Esc close ",
+      "actions go first"
+    )
+    h.eq(
+      ui.footer(keys, actions, 5, width - 1),
+      " Enter insert · Tab mark · C-Left/Right tabs · Esc close ",
+      "then the prefix"
+    )
+    h.eq(ui.footer(keys, actions, 5, 20), " Enter insert · C-Left/Right tabs · Esc close ", "then mark")
     prompt("")
     open()
-    local wide = footer()
+    local f = vim.api.nvim_win_get_config(ui.current().wins.prompt).footer
+    h.truthy(f[1][1]:find("tabs", 1, true), "the picker uses it")
     feed("<Esc>")
-    prompt("", 0, "pick-nogoto", { picker = { keys = { goto_tab = { "<M-%d>" } } } })
-    open()
-    local nogoto = footer()
-    feed("<Esc>")
-    vim.o.columns = 60
-    prompt("", 0, "pick-narrow")
-    open()
-    local narrow = footer()
-    feed("<Esc>")
-    vim.o.columns = columns
-    h.truthy(wide:find("C-Left/Right, C-g 1-3 tabs", 1, true), wide)
-    h.truthy(nogoto:find("C-Left/Right tabs", 1, true), nogoto)
-    h.truthy(not narrow:find("C-g", 1, true) and narrow:find("tabs", 1, true), narrow)
-    require("vergil").setup({ root = root })
   end,
   ["All lists files and skills with their kind"] = function()
     local b = prompt("")

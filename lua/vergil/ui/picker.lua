@@ -124,6 +124,51 @@ local function key_label(lhs)
   return (lhs:gsub("^<", ""):gsub(">$", ""):gsub("CR", "Enter"))
 end
 
+--- The footer's key hints, fitted to `width` display cells: action hints go
+--- first (the last one first), then the go-to-tab prefix ("C-g 1-5"), then
+--- "mark".
+---@param keys table<string, string[]> the picker's keys, defaults included
+---@param actions string[] action hints, e.g. "C-t mention"
+---@param tab_count integer
+---@param width integer
+---@return string
+function M.footer(keys, actions, tab_count, width)
+  actions = vim.list_slice(actions)
+  local prev, next = key_label(keys.prev_tab[1]), key_label(keys.next_tab[1])
+  local common = prev:match("^(%a%-)")
+  local cycle = (common and next:match("^(%a%-)") == common) and (prev .. "/" .. next:sub(#common + 1))
+    or (prev .. "/" .. next)
+  local goto_hint = {}
+  tab_count = math.min(9, tab_count)
+  for _, lhs in ipairs(keys.goto_tab) do
+    if not lhs:find("%d", 1, true) and tab_count > 1 then
+      goto_hint = { ("%s 1-%d"):format(key_label(lhs), tab_count) }
+      break
+    end
+  end
+  local mark = { key_label(keys.mark[1]) .. " mark" }
+  local function build()
+    local hints = { "Enter insert" }
+    vim.list_extend(hints, mark)
+    vim.list_extend(hints, actions)
+    hints[#hints + 1] = table.concat(vim.list_extend({ cycle }, goto_hint), ", ") .. " tabs"
+    hints[#hints + 1] = "Esc close"
+    return " " .. table.concat(hints, " · ") .. " "
+  end
+  local footer = build()
+  while vim.fn.strdisplaywidth(footer) > width and (#actions > 0 or #goto_hint > 0 or #mark > 0) do
+    if #actions > 0 then
+      table.remove(actions)
+    elseif #goto_hint > 0 then
+      goto_hint = {}
+    else
+      mark = {}
+    end
+    footer = build()
+  end
+  return footer
+end
+
 --- `text` cut to `width` display cells, with an ellipsis.
 local function fit(text, width)
   if vim.fn.strdisplaywidth(text) <= width then
@@ -325,46 +370,13 @@ function M.open(opts)
       title = { { (" %s "):format(status), "FloatTitle" }, { marked, "VergilPickerMark" } },
       title_pos = "left",
     })
-    -- Key hints, fitted to the width: action hints go first, then the
-    -- go-to-tab prefix ("C-g 1-5"), then "mark".
-    local prev, next = key_label(keys.prev_tab[1]), key_label(keys.next_tab[1])
-    local common = prev:match("^(%a%-)")
-    local cycle = (common and next:match("^(%a%-)") == common) and (prev .. "/" .. next:sub(#common + 1))
-      or (prev .. "/" .. next)
-    local goto_hint = {}
-    local tab_count = math.min(9, #opts.tabs)
-    for _, lhs in ipairs(keys.goto_tab) do
-      if not lhs:find("%d", 1, true) and tab_count > 1 then
-        goto_hint = { ("%s 1-%d"):format(key_label(lhs), tab_count) }
-        break
-      end
-    end
     local actions = {}
     for _, a in ipairs(opts.actions or {}) do
       if a.desc and a.keys[1] and (not a.when or a.when(tab())) then
         actions[#actions + 1] = key_label(a.keys[1]) .. " " .. a.desc
       end
     end
-    local mark = { key_label(keys.mark[1]) .. " mark" }
-    local function build()
-      local hints = { "Enter insert" }
-      vim.list_extend(hints, mark)
-      vim.list_extend(hints, actions)
-      hints[#hints + 1] = table.concat(vim.list_extend({ cycle }, goto_hint), ", ") .. " tabs"
-      hints[#hints + 1] = "Esc close"
-      return " " .. table.concat(hints, " · ") .. " "
-    end
-    local footer = build()
-    while vim.fn.strdisplaywidth(footer) > list_w - 2 and (#actions > 0 or #goto_hint > 0 or #mark > 0) do
-      if #actions > 0 then
-        table.remove(actions)
-      elseif #goto_hint > 0 then
-        goto_hint = {}
-      else
-        mark = {}
-      end
-      footer = build()
-    end
+    local footer = M.footer(keys, actions, #opts.tabs, list_w - 2)
     vim.api.nvim_win_set_config(prompt_win, { footer = footer, footer_pos = "left" })
   end
 
