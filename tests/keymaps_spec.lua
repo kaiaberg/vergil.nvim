@@ -121,6 +121,8 @@ return {
       "mention-line",
       "attach",
       "attach-line",
+      "next-path",
+      "prev-path",
     }) do
       h.truthy(vim.fn.maparg(("<Plug>(vergil-%s)"):format(name), "n") ~= "", name)
     end

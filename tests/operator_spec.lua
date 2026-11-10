@@ -80,6 +80,32 @@ return {
     vim.cmd("3Vergil attach")
     h.eq(text(b), { "`src/a.lua`", "`src/b.lua`", "@dir/x.txt" })
   end,
+  ["]f and [f visit the paths the operators would convert; . converts"] = function()
+    local b = prompt({
+      "see src/a.lua and `src/b.lua`, not nope.lua",
+      "```",
+      "src/b.lua",
+      "```",
+      "then dir/x.txt:1 and src/b.lua",
+    })
+    vim.keymap.set("n", "]f", "<Plug>(vergil-next-path)", { buffer = b, remap = true })
+    vim.keymap.set("n", "[f", "<Plug>(vergil-prev-path)", { buffer = b, remap = true })
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    feed("]f")
+    h.eq(vim.api.nvim_win_get_cursor(0), { 1, 4 })
+    feed("]f")
+    h.eq(vim.api.nvim_win_get_cursor(0), { 5, 5 }, "skips mentions, missing files and fences")
+    feed("2]f")
+    h.eq(vim.api.nvim_win_get_cursor(0), { 5, 5 }, "a count past the last path doesn't move")
+    feed("]f")
+    h.eq(vim.api.nvim_win_get_cursor(0), { 5, 21 })
+    feed("[f[f")
+    h.eq(vim.api.nvim_win_get_cursor(0), { 1, 4 })
+    feed("gmiW]f.")
+    h.eq(text(b)[1], "see `src/a.lua` and `src/b.lua`, not nope.lua")
+    h.eq(text(b)[5], "then `dir/x.txt#L1` and src/b.lua")
+    h.eq({ op.jump(-1) }, { false, "no path above" })
+  end,
   ["nothing to convert, and agents without attachments"] = function()
     local b = prompt({ "no paths here" })
     h.eq({ op.lines("mention", 1, 1) }, { false, "no paths to convert" })

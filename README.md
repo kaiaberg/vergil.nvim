@@ -258,6 +258,11 @@ kind, keep line ranges, and leave code blocks, inline code and missing
 files alone. `:[range]Vergil mention` and `:[range]Vergil attach` do the
 same for lines.
 
+To review them one by one, `]f` and `[f` (preset;
+`<Plug>(vergil-next-path)` and `<Plug>(vergil-prev-path)`) jump to the next
+or previous path to convert: `K` previews it, `gmiW` converts it, then `]f`
+and `.` for the next one, or `]f` again to skip it.
+
 ## Picking lines
 
 Type `#` straight after a reference. A float opens with the file, read-only
@@ -563,7 +568,8 @@ vergil maps nothing unless you ask. Every action has a `<Plug>` mapping:
 `<Plug>(vergil-send)`, `<Plug>(vergil-send-snippet)` and
 `<Plug>(vergil-send-both)` (Normal and Visual mode), the operators
 `<Plug>(vergil-mention)` and `<Plug>(vergil-attach)` (Normal and Visual
-mode), and `<Plug>(vergil-mention-line)` and `<Plug>(vergil-attach-line)`.
+mode), `<Plug>(vergil-mention-line)`, `<Plug>(vergil-attach-line)`,
+`<Plug>(vergil-next-path)` and `<Plug>(vergil-prev-path)`.
 
 `keymaps = { preset = true }` maps these in prompt buffers only:
 
@@ -572,6 +578,7 @@ mode), and `<Plug>(vergil-mention-line)` and `<Plug>(vergil-attach-line)`.
 | `K` | Preview; pressed again, closes it (`preview.on_repeat = "focus"` moves into it instead, as Neovim's own `K` does) |
 | `gs` / `gb` | Snippet from a ranged reference: replace it / keep it and add the lines below |
 | `gm` / `ga` | Make the paths in a motion or selection mentions / attachments; `gmm` / `gaa` the line's. Replaces Neovim's own `gm` and `ga` in prompts |
+| `]f` / `[f` | Next / previous path to convert. Replaces Neovim's own `]f` and `[f` (aliases of `gf`) in prompts |
 | `<C-g>` | Open the picker on what you're typing (Insert mode) or the word or reference under the cursor (Normal mode), and replace it with your choice |
 | `gf` / `<C-w>f` / `<C-w>gf` | Open the reference here / in a split / in a tab; the native key elsewhere |
 | `ZZ` / `ZQ` | `:Vergil submit` / `:Vergil abort` |

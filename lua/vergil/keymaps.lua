@@ -14,6 +14,8 @@ M.preset = {
   { lhs = "ga", plug = "<Plug>(vergil-attach)", desc = "Make paths in a motion attachments" },
   { lhs = "gaa", plug = "<Plug>(vergil-attach-line)", desc = "Make paths on the line attachments" },
   { lhs = "ga", plug = "<Plug>(vergil-attach)", desc = "Make paths in the selection attachments", mode = "x" },
+  { lhs = "]f", plug = "<Plug>(vergil-next-path)", desc = "Next path to convert" },
+  { lhs = "[f", plug = "<Plug>(vergil-prev-path)", desc = "Previous path to convert" },
   { lhs = "<Esc>", plug = "<Plug>(vergil-close-preview)", desc = "Close the preview, or Esc" },
   { lhs = "gf", plug = "<Plug>(vergil-open)", desc = "Open the reference, or gf" },
   { lhs = "<C-w>f", plug = "<Plug>(vergil-open-split)", desc = "Open the reference in a split, or <C-w>f" },
@@ -135,6 +137,18 @@ function M.define_plugs()
         return require("vergil.submit").abort()
       end),
       "abort and restore the prompt",
+    },
+    ["next-path"] = {
+      act(function()
+        return require("vergil.operator").jump(1, vim.v.count1)
+      end),
+      "next path to convert",
+    },
+    ["prev-path"] = {
+      act(function()
+        return require("vergil.operator").jump(-1, vim.v.count1)
+      end),
+      "previous path to convert",
     },
     ["hover"] = {
       function()

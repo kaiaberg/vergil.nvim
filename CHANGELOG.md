@@ -22,6 +22,9 @@ All notable changes are documented here. The format follows
   step that `.` repeats. They convert bare paths that exist and references
   of the other kind, and keep line ranges. The preset maps them to `gm`,
   `gmm`, `ga` and `gaa` in prompt buffers.
+- `<Plug>(vergil-next-path)` and `<Plug>(vergil-prev-path)` (`]f` and `[f`
+  with the preset) jump to the next or previous path the operators would
+  convert, so `]f` and `.` go through them one by one.
 
 - `picker.remember`: the picker keeps your join (`<C-o>`) and
   attach/mention (`<C-t>`) choices for the next picker, also in the next

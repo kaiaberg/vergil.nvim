@@ -165,6 +165,12 @@ leave fenced and inline code, missing files and everything else alone.
 One |u| undoes it all, and |.| repeats it elsewhere. |:Vergil-mention| and
 |:Vergil-attach| do the same for a range of lines.
 
+To go through them one by one, as |:s_c| would: <Plug>(vergil-next-path)
+and <Plug>(vergil-prev-path) (`]f` and `[f` with the preset) jump to the
+[count]th next or previous bare path that exists, outside code and
+references. Preview it with `K`, convert it with `gmiW`, then `]f` to the
+next one and |.| to convert it too, or `]f` again to skip it.
+
                                                              *vergil-observed*
 Observed behaviour, last checked with Claude Code 2.1.319. None of it is
 documented and any release may change it; |:checkhealth| `vergil` shows
@@ -514,6 +520,7 @@ vergil maps nothing by default. Normal-mode <Plug> mappings:
   <Plug>(vergil-send-snippet)   <Plug>(vergil-send-both)
   <Plug>(vergil-mention)        <Plug>(vergil-mention-line)
   <Plug>(vergil-attach)         <Plug>(vergil-attach-line)
+  <Plug>(vergil-next-path)      <Plug>(vergil-prev-path)
 
 The pick mappings also exist in Insert mode. The send mappings also exist in
 Visual mode, where they send the selected lines. <Plug>(vergil-mention) and
@@ -531,6 +538,8 @@ Visual mode; the `-line` ones convert [count] lines.
             line's (|vergil-convert|). Replaces the native |gm|
   ga        The same as attachments; `gaa` the line's. Replaces the
             native |ga|
+  ]f  [f    Next or previous path to convert (|vergil-convert|). Replace
+            the native |]f| and |[f| (aliases of |gf|)
   gf        Open the reference; the native |gf| elsewhere
   <C-w>f    Open it in a split; the native |CTRL-W_f| elsewhere
   <C-w>gf   Open it in a tab; the native |CTRL-W_gf| elsewhere
