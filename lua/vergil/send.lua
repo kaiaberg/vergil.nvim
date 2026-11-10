@@ -6,7 +6,6 @@
 --- The first send after `gd` or `:Vergil open` replaces the reference that was
 --- opened, as `#` would. Otherwise the result goes after the prompt's cursor
 --- (after a reference, never inside one), with spaces where needed.
-local parser = require("vergil.reference.parser")
 local resolver = require("vergil.reference.resolver")
 
 local M = {}
@@ -50,7 +49,7 @@ local function opened_ref(session, abs)
   if not (jump and same_file(jump.abs, abs)) then
     return nil
   end
-  local ref = parser.at(parser.parse_buffer(session.bufnr), jump.row, jump.col)
+  local ref = require("vergil.reference.bare").ref_at(session.bufnr, jump.row, jump.col, session.root)
   if not ref or ref.resource or ref.unterminated or ref.in_fence then
     return nil
   end
@@ -69,7 +68,7 @@ local function target_span(session, win, abs, path, action)
     return opened, opened.span
   end
   local row, col = unpack(vim.api.nvim_win_get_cursor(win))
-  local ref = parser.at(parser.parse_buffer(prompt), row - 1, col)
+  local ref = require("vergil.reference.bare").ref_at(prompt, row - 1, col, session.root)
 
   local line = vim.api.nvim_buf_get_lines(prompt, row - 1, row, false)[1] or ""
   local at = 0

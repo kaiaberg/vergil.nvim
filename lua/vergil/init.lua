@@ -67,10 +67,9 @@ function M.preview()
   if not s then
     return false, err
   end
-  local parser = require("vergil.reference.parser")
   local row, col = unpack(vim.api.nvim_win_get_cursor(0))
   local hover = require("vergil.lsp.hover")
-  local ref = parser.at(parser.parse_buffer(s.bufnr), row - 1, col)
+  local ref = require("vergil.reference.bare").ref_at(s.bufnr, row - 1, col, s.root)
   local contents = ref and hover.contents(ref, s.root)
   if not contents and not ref then
     local _, skill = hover.skill_at(s, row - 1, col)
@@ -184,9 +183,8 @@ function M.toggle()
   if not s then
     return false, "not enabled in this buffer (use :Vergil enable)"
   end
-  local parser = require("vergil.reference.parser")
   local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-  local ref = parser.at(parser.parse_buffer(bufnr), row - 1, col)
+  local ref = require("vergil.reference.bare").ref_at(bufnr, row - 1, col, s.root)
   if not ref then
     return false, "no reference under the cursor"
   end

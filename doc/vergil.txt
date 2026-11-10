@@ -144,6 +144,15 @@ Attach the files the agent must read in full, once; mention everything
 else.
 Mentions of an attached file are never flagged.
 
+                                                            *vergil-bare-path*
+A path written without `@` or backticks, such as `src/a.ts:12` pasted
+from a log, is a bare path. Like |gf|, vergil looks for one only under the
+cursor, and only takes it if the file or directory exists. Then
+|:Vergil-preview| (`K`), |:Vergil-open| (`gd`), |:Vergil-snippet| (`gs`),
+|:Vergil-range| and |:Vergil-toggle| work on it as on a mention, keeping
+its lines. Toggle makes it a mention in your format, `` `src/a.ts#L12` ``;
+toggle again to attach it. Bare paths are never flagged.
+
                                                              *vergil-observed*
 Observed behaviour, last checked with Claude Code 2.1.319. None of it is
 documented and any release may change it; |:checkhealth| `vergil` shows
@@ -416,6 +425,7 @@ prompt from before `Ctrl+G`, even if it was written in between.
 
 :Vergil toggle                                           *:Vergil-toggle*
     Convert the reference under the cursor between attachment and mention.
+    A |vergil-bare-path| becomes a mention.
 
 :Vergil pick [{tab}]                                       *:Vergil-pick*
     Open |vergil-picker| on {tab}: `all` (default), `attach` or `mention`

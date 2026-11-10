@@ -23,12 +23,20 @@ local function refuse(ref)
   end
 end
 
---- `@file` → `` `file` ``; `@file#L12-L35` → `` `file#L12-L35` ``.
+--- `@file` → `` `file` ``; `@file#L12-L35` → `` `file#L12-L35` ``. A bare
+--- path keeps its lines in the configured format: `a.ts:12` → `` `a.ts#L12` ``.
 ---@param ref vergil.Reference
 ---@param ctx vergil.ConvertCtx
 ---@return vergil.Edit?
 ---@return string? err
 function M.to_mention(ref, ctx)
+  if ref.bare then
+    local text, ferr = formatter.mention(ref.path, ref.start_line, ref.end_line, ctx.mention_format)
+    if not text then
+      return nil, ferr
+    end
+    return { span = ref.span, text = text }
+  end
   if ref.mode ~= "attach" then
     return nil, "already a mention"
   end
@@ -67,13 +75,13 @@ function M.to_attachment(ref, ctx)
   return { span = ref.span, text = attach }
 end
 
---- Converts to the other reference type.
+--- Converts to the other reference type. A bare path becomes a mention.
 ---@param ref vergil.Reference
 ---@param ctx vergil.ConvertCtx
 ---@return vergil.Edit?
 ---@return string? err
 function M.toggle(ref, ctx)
-  if ref.mode == "attach" then
+  if ref.mode == "attach" or ref.bare then
     return M.to_mention(ref, ctx)
   end
   return M.to_attachment(ref, ctx)

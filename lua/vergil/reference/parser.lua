@@ -37,6 +37,7 @@ local M = {}
 ---@field resource boolean? non-file attachment such as `@server:resource`
 ---@field ignored_range integer[]? attachment `#range` that doesn't limit it
 ---@field explicit boolean? mention content clearly is a path
+---@field bare boolean? a path without `@` or backticks (`vergil.reference.bare`)
 
 ---@class vergil.ParseOpts
 ---@field attach vergil.AttachSpec? nil: the agent has no attachments

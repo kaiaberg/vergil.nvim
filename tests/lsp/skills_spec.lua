@@ -98,11 +98,12 @@ return {
       h.eq(h.request(client, bufnr, "textDocument/hover", 0, 2), nil)
     end)
   end,
-  ["unknown /words and paths get no hover"] = function()
+  ["unknown /words get no hover; existing paths preview as paths"] = function()
     with_env(function()
       local bufnr, client = h.prompt(root, { "/nothing and /usr/bin" }, "skills")
       h.eq(h.request(client, bufnr, "textDocument/hover", 0, 3), nil)
-      h.eq(h.request(client, bufnr, "textDocument/hover", 0, 16), nil)
+      local hv = h.request(client, bufnr, "textDocument/hover", 0, 16)
+      h.truthy(hv.contents.value:find("**/usr/bin/** · directory", 1, true), hv.contents.value)
     end)
   end,
   [":Vergil open on a skill opens its definition"] = function()

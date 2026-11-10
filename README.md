@@ -242,6 +242,12 @@ How an agent treats attachments isn't documented and changes between releases.
 In the `@` menu, files you already attached are marked `· attached`. Paths
 with spaces are quoted: `@"docs/my notes.md"`.
 
+A path without `@` or backticks, such as `src/a.ts:12` pasted from a log,
+works too when it's under the cursor and the file exists, like `gf`: `K`
+previews it, `gd` opens it at its line, `gs` replaces it with its lines,
+and `:Vergil toggle` makes it a mention (`` `src/a.ts#L12` ``), then an
+attachment.
+
 ## Picking lines
 
 Type `#` straight after a reference. A float opens with the file, read-only
@@ -520,7 +526,7 @@ will open.
 | `:Vergil range` | Select lines for the reference under the cursor |
 | `:Vergil snippet [both]` | Replace a ranged reference with its lines (`both`: keep it, add the lines below) |
 | `:Vergil send [snippet\|both]` | Send the cursor line, or a range (`:'<,'>`), of the current file to the prompt as a mention, snippet or both |
-| `:Vergil toggle` | Convert between attachment and mention |
+| `:Vergil toggle` | Convert between attachment and mention; a bare path becomes a mention |
 | `:Vergil pick [all\|attach\|mention\|changed\|branches\|commits\|skills]` | Open [the picker](#the-picker) on that tab (default All) |
 | `:Vergil diff [staged\|<rev>]` | Insert `git diff` (default: all uncommitted changes) as a fenced `diff` block |
 | `:Vergil submit` | Write the prompt, settle other modified buffers, exit |

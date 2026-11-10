@@ -24,6 +24,13 @@ local function value(line, col)
 end
 
 return {
+  ["bare path: previewed like a mention, labelled path"] = function()
+    local v = value("look at src/a.lua:3 please", 9)
+    h.truthy(v:find("· path", 1, true), v)
+    h.truthy(v:find("line 3", 1, true), v)
+    h.eq(value("look at nothing.lua please", 9), nil)
+    h.eq(value("look at it please", 5), nil)
+  end,
   ["attachment: header and first lines in a fenced block"] = function()
     local v = value("@src/a.lua", 2)
     h.truthy(v:find("**src/a.lua** · 231 B · 30 lines · attachment", 1, true), v)

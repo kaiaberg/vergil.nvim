@@ -12,6 +12,10 @@ All notable changes are documented here. The format follows
   `mention.format` is: `` `a.ts:12` `` and `` `a.ts:3-9` `` no longer read
   as missing files under the default `github` format, and `` `a.ts:12:5` ``
   (line and column, as compilers print it) reads as line 12.
+- Bare paths: a path without `@` or backticks under the cursor, such as
+  `src/a.ts:12` pasted from a log, works like a mention when the file
+  exists, as `gf` would find it: `K`, `gd`, `gs`, `:Vergil range` and
+  `:Vergil send` use it, and `:Vergil toggle` makes it a mention.
 
 - `picker.remember`: the picker keeps your join (`<C-o>`) and
   attach/mention (`<C-t>`) choices for the next picker, also in the next

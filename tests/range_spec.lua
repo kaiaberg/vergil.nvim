@@ -182,6 +182,23 @@ return {
       "After",
     })
   end,
+  [":Vergil snippet on a bare path with lines, as pasted from a log"] = function()
+    local b = h.prompt(root, { "Before", "src/a.lua:4-5", "After" }, "snipbare")
+    vim.api.nvim_win_set_cursor(0, { 2, 3 })
+    vim.cmd("Vergil snippet")
+    h.eq(text(b), {
+      "Before",
+      "",
+      "From `src/a.lua#L4-L5`:",
+      "",
+      "```lua",
+      "line 4",
+      "\tindented `code` here  ",
+      "```",
+      "",
+      "After",
+    })
+  end,
   [":Vergil snippet both keeps the mention; @file#range becomes a mention"] = function()
     local b = h.prompt(root, { "see @src/a.lua#L2-L3 here" }, "snip")
     vim.api.nvim_win_set_cursor(0, { 1, 6 })

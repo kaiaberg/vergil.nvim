@@ -1,6 +1,5 @@
 --- `textDocument/definition`: jump to a reference's target at its line.
 local hover = require("vergil.lsp.hover")
-local parser = require("vergil.reference.parser")
 local resolver = require("vergil.reference.resolver")
 
 local M = {}
@@ -13,7 +12,7 @@ local M = {}
 ---@return { abs: string, line: integer, type: string }?
 ---@return string? err
 function M.target_at(bufnr, row, col, root)
-  local ref = parser.at(parser.parse_buffer(bufnr), row, col)
+  local ref = require("vergil.reference.bare").ref_at(bufnr, row, col, root)
   if not ref then
     return nil, "no reference under the cursor"
   end

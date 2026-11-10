@@ -74,7 +74,7 @@ function M.contents(ref, root)
     return nil
   end
   local name = target.rel or target.abs
-  local kind = ref.mode == "attach" and "attachment" or "mention"
+  local kind = ref.mode == "attach" and "attachment" or ref.bare and "path" or "mention"
   if not target.exists then
     return { ("**%s**"):format(name), "", ("Not found: `%s` (%s)"):format(target.abs, kind) }
   end
@@ -188,7 +188,7 @@ end
 ---@param respond fun(result: table?)
 function M.handle(params, session, respond)
   local row, col = params.position.line, params.position.character
-  local ref = parser.at(parser.parse_buffer(session.bufnr), row, col)
+  local ref = require("vergil.reference.bare").ref_at(session.bufnr, row, col, session.root)
   if not ref then
     return respond(M.skill_hover(session, row, col))
   end

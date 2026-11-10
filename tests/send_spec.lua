@@ -48,6 +48,13 @@ return {
     send.send("mention", 4, 4)
     h.eq(text(b), { "Why does `src/a.lua#L2-L3` `src/a.lua#L4` fail?" }, "a second send adds")
   end,
+  ["opening a bare path and sending replaces it too"] = function()
+    local b = opened({ "Why does src/a.lua:1 fail?" }, { 1, 12 }, "send-bare")
+    h.eq(vim.uv.fs_realpath(vim.api.nvim_buf_get_name(0)), vim.uv.fs_realpath(root .. "/src/a.lua"))
+    h.eq(vim.api.nvim_win_get_cursor(0)[1], 1, "opened at its line")
+    h.eq(send.send("mention", 2, 3), true)
+    h.eq(text(b), { "Why does `src/a.lua#L2-L3` fail?" })
+  end,
   ["gd records the reference too"] = function()
     vim.cmd("silent! %bwipeout!")
     local b, client = h.prompt(root, { "See `src/b.lua`" }, "send-gd")

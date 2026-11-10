@@ -203,7 +203,7 @@ local function context_at(bufnr, row, col)
   if not session then
     return nil, "not enabled in this buffer (use :Vergil enable)"
   end
-  local ref = parser.at(parser.parse_buffer(bufnr), row, col)
+  local ref = require("vergil.reference.bare").ref_at(bufnr, row, col, session.root)
   if not ref then
     return nil, "no reference under the cursor"
   end

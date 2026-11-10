@@ -24,6 +24,12 @@ return {
       range = { start = { line = 11, character = 0 }, ["end"] = { line = 11, character = 0 } },
     })
   end,
+  ["definition of a bare path keeps its line; missing ones give nothing"] = function()
+    local bufnr, client = setup("see src/a.lua:12, then")
+    h.eq(h.request(client, bufnr, "textDocument/definition", 0, 6).range.start.line, 11)
+    bufnr, client = setup("see src/nope.lua:12")
+    h.eq(h.request(client, bufnr, "textDocument/definition", 0, 6), nil)
+  end,
   ["definition of an attachment is line 1; missing targets give nothing"] = function()
     local bufnr, client = setup("@src/a.lua")
     h.eq(h.request(client, bufnr, "textDocument/definition", 0, 2).range.start.line, 0)
