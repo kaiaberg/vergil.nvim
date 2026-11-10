@@ -1,5 +1,6 @@
 --- Formats references as text. Mention syntax is agent-independent and
---- configurable via templates; attachment syntax comes from the adapter.
+--- configurable via templates; attachment syntax comes from the agent's
+--- `attach`.
 local M = {}
 
 ---@type table<string, vergil.MentionTemplates>
