@@ -621,7 +621,9 @@ and warns about option names it doesn't know, such as a typo like `keymap`.
 
 The `colon` format writes mentions as `` `src/a.ts:12-35` ``. Custom templates
 must start with `{path}`, put a separator after it, and put `{start}` before
-`{end}`.
+`{end}`. The format only decides what vergil writes: mentions in either
+preset's form, and `` `a.ts:12:5` `` (line and column), are read in any of
+them, so pasted ranges keep their lines.
 
 See `:help vergil` for details.
 

@@ -136,6 +136,9 @@ files may be skipped or cut (|vergil-observed|).
 `` `path` `` mentions a file: the agent knows where to look and reads it
 only if needed. Mentions can point at lines: `` `path#L12` ``, `` `path#L12-L35` ``
 (the "github" format) or `` `path:12-35` `` (the "colon" format).
+vergil writes the format you configure (|vergil-config|) but reads both,
+and `` `path:12:5` `` (line and column) as line 12, so ranges pasted from
+logs or other tools keep their lines.
 
 Attach the files the agent must read in full, once; mention everything
 else.

@@ -9,6 +9,9 @@ M.presets = {
   colon = { single = "{path}:{start}", range = "{path}:{start}-{end}" },
 }
 
+--- Presets tried, in this order, when the configured format doesn't match.
+local PRESET_ORDER = { "github", "colon" }
+
 ---@class vergil.CompiledFormat
 ---@field single string
 ---@field range string
@@ -114,14 +117,8 @@ function M.mention(path, start_line, end_line, fmt)
   return "`" .. body .. "`"
 end
 
---- Splits mention content (between backticks) into path and range.
----@param content string
----@param fmt string|vergil.MentionTemplates
----@return string path
----@return integer? start_line
----@return integer? end_line
-function M.parse_mention(content, fmt)
-  local f = M.compile(fmt)
+--- Range in one compiled format, or nil.
+local function match_range(content, f)
   local p, s, e = content:match(f.range_pat)
   if p and p ~= "" then
     return p, tonumber(s), tonumber(e)
@@ -129,6 +126,34 @@ function M.parse_mention(content, fmt)
   p, s = content:match(f.single_pat)
   if p and p ~= "" then
     return p, tonumber(s), tonumber(s)
+  end
+end
+
+--- Splits mention content (between backticks) into path and range.
+--- `path:12:5` (line and column, as compilers print it) reads as line 12.
+--- Otherwise the configured format wins, then any preset's range is read
+--- too, so pasted `a.ts:12` isn't taken for a file named `a.ts:12`.
+---@param content string
+---@param fmt string|vergil.MentionTemplates
+---@return string path
+---@return integer? start_line
+---@return integer? end_line
+function M.parse_mention(content, fmt)
+  -- Before the formats: `colon` would read `a.ts:12:5` as `a.ts:12`, line 5.
+  local p, s = content:match("^(.-):(%d+):%d+$")
+  if p and p ~= "" then
+    return p, tonumber(s), tonumber(s)
+  end
+  local e
+  p, s, e = match_range(content, M.compile(fmt))
+  if p then
+    return p, s, e
+  end
+  for _, name in ipairs(PRESET_ORDER) do
+    p, s, e = match_range(content, M.compile(name))
+    if p then
+      return p, s, e
+    end
   end
   return content, nil, nil
 end

@@ -26,6 +26,23 @@ return {
       end
     end
   end,
+  ["other presets' ranges are read too"] = function()
+    h.eq({ fmt.parse_mention("src/a.ts:12", "github") }, { "src/a.ts", 12, 12 })
+    h.eq({ fmt.parse_mention("src/a.ts:12-30", "github") }, { "src/a.ts", 12, 30 })
+    h.eq({ fmt.parse_mention("src/a.ts#L12-L30", "colon") }, { "src/a.ts", 12, 30 })
+    local t = { single = "{path} line {start}", range = "{path} lines {start} to {end}" }
+    h.eq({ fmt.parse_mention("a.ts:4", t) }, { "a.ts", 4, 4 })
+  end,
+  ["line and column read as the line"] = function()
+    h.eq({ fmt.parse_mention("src/a.ts:12:5", "github") }, { "src/a.ts", 12, 12 })
+    h.eq({ fmt.parse_mention("src/a.ts:12:5", "colon") }, { "src/a.ts", 12, 12 })
+  end,
+  ["the configured format wins"] = function()
+    -- `#L4` is a literal part of the path in a format that doesn't use it,
+    -- only when the configured format itself matches first.
+    local t = { single = "{path}@{start}", range = "{path}@{start}-{end}" }
+    h.eq({ fmt.parse_mention("a#L4.ts@7", t) }, { "a#L4.ts", 7, 7 })
+  end,
   ["plain content parses as path without range"] = function()
     h.eq({ fmt.parse_mention("src/a.ts", "github") }, { "src/a.ts" })
   end,

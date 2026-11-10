@@ -8,6 +8,11 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Mentions keep their lines in either built-in form, whatever
+  `mention.format` is: `` `a.ts:12` `` and `` `a.ts:3-9` `` no longer read
+  as missing files under the default `github` format, and `` `a.ts:12:5` ``
+  (line and column, as compilers print it) reads as line 12.
+
 - `picker.remember`: the picker keeps your join (`<C-o>`) and
   attach/mention (`<C-t>`) choices for the next picker, also in the next
   prompt. `"confirm"` (default) keeps them when you insert something,

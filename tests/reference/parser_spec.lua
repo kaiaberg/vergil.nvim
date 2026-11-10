@@ -30,6 +30,16 @@ return {
     h.eq({ refs[2].start_line, refs[2].end_line, refs[2].text }, { 12, 35, "`src/auth/session.ts#L12-L35`" })
     h.eq(refs[2].span, { start_row = 4, start_col = 13, end_row = 4, end_col = 42 })
   end,
+  ["pasted colon and line:column ranges keep their lines"] = function()
+    local refs = parse("see `src/a.ts:12`, `src/a.ts:3-9` and `src/a.ts:40:7`", "github")
+    h.eq(summary(refs), { "mention:src/a.ts", "mention:src/a.ts", "mention:src/a.ts" })
+    h.eq(
+      vim.tbl_map(function(r)
+        return { r.start_line, r.end_line }
+      end, refs),
+      { { 12, 12 }, { 3, 9 }, { 40, 40 } }
+    )
+  end,
   ["a name after a ranged mention belongs to it"] = function()
     h.eq(
       summary(parse("see `a.lua#L3-L9` (`M.apply`) and `b.lua` (`c.lua`)")),
