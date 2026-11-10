@@ -11,6 +11,9 @@ local M = {}
 --- punctuation, so `(src/a.ts)` and `"a.ts",` give the path alone.
 local DELIM = "[%s%(%)%[%]{}<>\"'`,;|]"
 
+--- A run of characters between delimiters, with its 1-based start.
+local WORD = "()[^%s%(%)%[%]{}<>\"'`,;|]+"
+
 --- Trailing characters that end a sentence rather than belong to the path.
 local TRAILING = "[%.:!?]+$"
 
@@ -60,6 +63,49 @@ function M.candidate(line, col, fmt)
   return { path = path, start_line = first, end_line = last, start_col = s - 1, end_col = e, text = text }
 end
 
+--- Every candidate on a line that starts in a byte range, outside inline
+--- code. Pure, like `candidate`.
+---@param line string
+---@param first integer 0-based byte column, inclusive
+---@param last integer 0-based byte column, exclusive
+---@param fmt string|vergil.MentionTemplates
+---@return vergil.BareCandidate[]
+function M.candidates(line, first, last, fmt)
+  local code = require("vergil.reference.parser").code_spans(line)
+  local out = {}
+  for s in line:gmatch(WORD) do
+    local col = s - 1
+    local in_code = false
+    for _, span in ipairs(code) do
+      if s > span.start and s < span.finish then
+        in_code = true
+        break
+      end
+    end
+    if col >= first and col < last and not in_code then
+      out[#out + 1] = M.candidate(line, col, fmt)
+    end
+  end
+  return out
+end
+
+--- A candidate on a row as a mention reference (`bare = true`).
+---@param c vergil.BareCandidate
+---@param row integer 0-based
+---@return vergil.Reference
+function M.reference(c, row)
+  return {
+    mode = "mention",
+    bare = true,
+    explicit = true,
+    path = c.path,
+    start_line = c.start_line,
+    end_line = c.end_line,
+    span = { start_row = row, start_col = c.start_col, end_row = row, end_col = c.end_col },
+    text = c.text,
+  }
+end
+
 --- A bare path at a position that exists on disk, as a mention reference
 --- (`bare = true`), or nil.
 ---@param bufnr integer
@@ -76,17 +122,7 @@ function M.at(bufnr, row, col, root)
   if not c then
     return nil
   end
-  ---@type vergil.Reference
-  local ref = {
-    mode = "mention",
-    bare = true,
-    explicit = true,
-    path = c.path,
-    start_line = c.start_line,
-    end_line = c.end_line,
-    span = { start_row = row, start_col = c.start_col, end_row = row, end_col = c.end_col },
-    text = c.text,
-  }
+  local ref = M.reference(c, row)
   local target = resolver.resolve(ref, root)
   if not (target and target.exists) then
     return nil

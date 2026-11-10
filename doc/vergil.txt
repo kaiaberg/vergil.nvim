@@ -153,6 +153,18 @@ cursor, and only takes it if the file or directory exists. Then
 its lines. Toggle makes it a mention in your format, `` `src/a.ts#L12` ``;
 toggle again to attach it. Bare paths are never flagged.
 
+                                                             *vergil-convert*
+To convert many at once, for text pasted from logs or chats, use the
+operators <Plug>(vergil-mention) and <Plug>(vergil-attach) (`gm` and `ga`
+with the preset) with any motion or in Visual mode: `gmip` makes every
+path in the paragraph a mention, `gaa` attaches the ones on the line. They
+convert bare paths that exist and references of the other kind, keep
+line ranges (an attachment keeps its range as a mention after it, as
+|:Vergil-toggle| does), write paths under the root relative to it, and
+leave fenced and inline code, missing files and everything else alone.
+One |u| undoes it all, and |.| repeats it elsewhere. |:Vergil-mention| and
+|:Vergil-attach| do the same for a range of lines.
+
                                                              *vergil-observed*
 Observed behaviour, last checked with Claude Code 2.1.319. None of it is
 documented and any release may change it; |:checkhealth| `vergil` shows
@@ -427,6 +439,12 @@ prompt from before `Ctrl+G`, even if it was written in between.
     Convert the reference under the cursor between attachment and mention.
     A |vergil-bare-path| becomes a mention.
 
+:[range]Vergil mention                                   *:Vergil-mention*
+:[range]Vergil attach                                     *:Vergil-attach*
+    Make the paths on [range] lines mentions or attachments. Without a
+    range, `:Vergil mention` and `:Vergil attach` convert the cursor line.
+    See |vergil-convert|.
+
 :Vergil pick [{tab}]                                       *:Vergil-pick*
     Open |vergil-picker| on {tab}: `all` (default), `attach` or `mention`
     (Files, in that mode), `changed`, `branches`, `commits` or `skills`.
@@ -494,9 +512,13 @@ vergil maps nothing by default. Normal-mode <Plug> mappings:
   <Plug>(vergil-pick-branches)  <Plug>(vergil-hover)
   <Plug>(vergil-pick-expand)    <Plug>(vergil-send)
   <Plug>(vergil-send-snippet)   <Plug>(vergil-send-both)
+  <Plug>(vergil-mention)        <Plug>(vergil-mention-line)
+  <Plug>(vergil-attach)         <Plug>(vergil-attach-line)
 
 The pick mappings also exist in Insert mode. The send mappings also exist in
-Visual mode, where they send the selected lines.
+Visual mode, where they send the selected lines. <Plug>(vergil-mention) and
+<Plug>(vergil-attach) are operators (|vergil-convert|) and also work in
+Visual mode; the `-line` ones convert [count] lines.
 
                                                         *vergil-keymap-preset*
 `keymaps = { preset = true }` maps, in prompt buffers only:
@@ -505,6 +527,10 @@ Visual mode, where they send the selected lines.
             with `preview.on_repeat = "focus"` (Neovim's own behaviour)
   gs        Replace a ranged reference with its lines
   gb        Keep it and add its lines below
+  gm        Make the paths in a motion or selection mentions; `gmm` the
+            line's (|vergil-convert|). Replaces the native |gm|
+  ga        The same as attachments; `gaa` the line's. Replaces the
+            native |ga|
   gf        Open the reference; the native |gf| elsewhere
   <C-w>f    Open it in a split; the native |CTRL-W_f| elsewhere
   <C-w>gf   Open it in a tab; the native |CTRL-W_gf| elsewhere

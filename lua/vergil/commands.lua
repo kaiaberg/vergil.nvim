@@ -83,6 +83,18 @@ M.subcommands = {
       notify(err, vim.log.levels.WARN)
     end
   end,
+  mention = function(_, opts)
+    local ok, err = require("vergil.operator").lines("mention", opts.line1, opts.line2)
+    if not ok then
+      notify(err, vim.log.levels.WARN)
+    end
+  end,
+  attach = function(_, opts)
+    local ok, err = require("vergil.operator").lines("attach", opts.line1, opts.line2)
+    if not ok then
+      notify(err, vim.log.levels.WARN)
+    end
+  end,
 }
 
 ---@param opts { fargs: string[], line1: integer, line2: integer }

@@ -16,6 +16,12 @@ All notable changes are documented here. The format follows
   `src/a.ts:12` pasted from a log, works like a mention when the file
   exists, as `gf` would find it: `K`, `gd`, `gs`, `:Vergil range` and
   `:Vergil send` use it, and `:Vergil toggle` makes it a mention.
+- Operators `<Plug>(vergil-mention)` and `<Plug>(vergil-attach)`, with
+  `-line` variants and `:[range]Vergil mention|attach`: make every path in
+  a motion, selection or range a mention or an attachment, as one undo
+  step that `.` repeats. They convert bare paths that exist and references
+  of the other kind, and keep line ranges. The preset maps them to `gm`,
+  `gmm`, `ga` and `gaa` in prompt buffers.
 
 - `picker.remember`: the picker keeps your join (`<C-o>`) and
   attach/mention (`<C-t>`) choices for the next picker, also in the next

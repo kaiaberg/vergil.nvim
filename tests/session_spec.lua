@@ -157,9 +157,11 @@ return {
     h.eq(require("vergil.commands").complete("t", "Vergil t"), { "toggle" })
     h.eq(require("vergil.commands").complete("", "Vergil "), {
       "abort",
+      "attach",
       "diff",
       "disable",
       "enable",
+      "mention",
       "open",
       "pick",
       "preview",

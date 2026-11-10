@@ -8,6 +8,12 @@ M.preset = {
   { lhs = "K", plug = "<Plug>(vergil-hover)", desc = "Preview; again closes it (preview.on_repeat)" },
   { lhs = "gs", plug = "<Plug>(vergil-snippet)", desc = "Replace reference with its lines" },
   { lhs = "gb", plug = "<Plug>(vergil-snippet-both)", desc = "Add the reference's lines below" },
+  { lhs = "gm", plug = "<Plug>(vergil-mention)", desc = "Make paths in a motion mentions" },
+  { lhs = "gmm", plug = "<Plug>(vergil-mention-line)", desc = "Make paths on the line mentions" },
+  { lhs = "gm", plug = "<Plug>(vergil-mention)", desc = "Make paths in the selection mentions", mode = "x" },
+  { lhs = "ga", plug = "<Plug>(vergil-attach)", desc = "Make paths in a motion attachments" },
+  { lhs = "gaa", plug = "<Plug>(vergil-attach-line)", desc = "Make paths on the line attachments" },
+  { lhs = "ga", plug = "<Plug>(vergil-attach)", desc = "Make paths in the selection attachments", mode = "x" },
   { lhs = "<Esc>", plug = "<Plug>(vergil-close-preview)", desc = "Close the preview, or Esc" },
   { lhs = "gf", plug = "<Plug>(vergil-open)", desc = "Open the reference, or gf" },
   { lhs = "<C-w>f", plug = "<Plug>(vergil-open-split)", desc = "Open the reference in a split, or <C-w>f" },
@@ -165,6 +171,16 @@ function M.define_plugs()
       end
     end, { desc = "vergil: send lines to the prompt (" .. action .. ")" })
   end
+  -- Operators converting the paths in a motion, like `gc`; repeat with `.`.
+  for _, to in ipairs({ "mention", "attach" }) do
+    local what = to == "mention" and "mentions" or "attachments"
+    vim.keymap.set({ "n", "x" }, ("<Plug>(vergil-%s)"):format(to), function()
+      return require("vergil.operator").expr(to)
+    end, { expr = true, desc = ("vergil: make paths %s (operator)"):format(what) })
+    vim.keymap.set("n", ("<Plug>(vergil-%s-line)"):format(to), function()
+      return require("vergil.operator").expr(to) .. "_"
+    end, { expr = true, desc = ("vergil: make paths on the line %s"):format(what) })
+  end
   for _, kind in ipairs(require("vergil.picker.kinds")) do
     local lhs = kind == "all" and "<Plug>(vergil-pick)" or ("<Plug>(vergil-pick-%s)"):format(kind)
     vim.keymap.set({ "n", "i" }, lhs, function()
@@ -275,7 +291,7 @@ function M.detach(bufnr)
     return
   end
   -- Only delete mappings vergil made; leave a user's own buffer mappings.
-  for _, mode in ipairs({ "n", "i" }) do
+  for _, mode in ipairs({ "n", "i", "x" }) do
     local ours = {}
     for _, m in ipairs(M.preset) do
       if (m.mode or "n") == mode then

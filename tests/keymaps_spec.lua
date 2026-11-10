@@ -117,6 +117,10 @@ return {
       "pick-mention",
       "pick-skills",
       "close-preview",
+      "mention",
+      "mention-line",
+      "attach",
+      "attach-line",
     }) do
       h.truthy(vim.fn.maparg(("<Plug>(vergil-%s)"):format(name), "n") ~= "", name)
     end

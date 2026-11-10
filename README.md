@@ -211,6 +211,7 @@ handling:
 | To | Do | More |
 |---|---|---|
 | Mention a file without loading it | `@@sess` gives `` `src/auth/session.ts` `` | [Attach or mention?](#attach-or-mention) |
+| Turn pasted paths into references | `gmip` (preset) makes every path in the paragraph a mention | [Attach or mention?](#attach-or-mention) |
 | Paste lines verbatim | `gs` in the line selector (`gb` adds them below the mention) | [Picking lines](#picking-lines) |
 | Point at a function by name | `gO` in the line selector | [Picking lines](#picking-lines) |
 | Search files, skills and git with a preview | `<C-g>` while typing (preset), or `:Vergil pick` | [The picker](#the-picker) |
@@ -247,6 +248,15 @@ works too when it's under the cursor and the file exists, like `gf`: `K`
 previews it, `gd` opens it at its line, `gs` replaces it with its lines,
 and `:Vergil toggle` makes it a mention (`` `src/a.ts#L12` ``), then an
 attachment.
+
+To convert many at once, use the operators `<Plug>(vergil-mention)` and
+`<Plug>(vergil-attach)` (`gm` and `ga` with the [preset](#mappings)) with
+any motion or selection: `gmip` makes every path in the paragraph a
+mention, `gaa` attaches the ones on the line, `.` repeats it and one `u`
+undoes it. They convert bare paths that exist and references of the other
+kind, keep line ranges, and leave code blocks, inline code and missing
+files alone. `:[range]Vergil mention` and `:[range]Vergil attach` do the
+same for lines.
 
 ## Picking lines
 
@@ -527,6 +537,7 @@ will open.
 | `:Vergil snippet [both]` | Replace a ranged reference with its lines (`both`: keep it, add the lines below) |
 | `:Vergil send [snippet\|both]` | Send the cursor line, or a range (`:'<,'>`), of the current file to the prompt as a mention, snippet or both |
 | `:Vergil toggle` | Convert between attachment and mention; a bare path becomes a mention |
+| `:[range]Vergil mention` / `:[range]Vergil attach` | Make every path on the lines a mention / an attachment |
 | `:Vergil pick [all\|attach\|mention\|changed\|branches\|commits\|skills]` | Open [the picker](#the-picker) on that tab (default All) |
 | `:Vergil diff [staged\|<rev>]` | Insert `git diff` (default: all uncommitted changes) as a fenced `diff` block |
 | `:Vergil submit` | Write the prompt, settle other modified buffers, exit |
@@ -548,9 +559,11 @@ vergil maps nothing unless you ask. Every action has a `<Plug>` mapping:
 `<Plug>(vergil-pick-skills)`, `<Plug>(vergil-pick-changed)`,
 `<Plug>(vergil-pick-branches)`, `<Plug>(vergil-pick-commits)`,
 `<Plug>(vergil-pick-expand)` (these also in Insert mode),
-`<Plug>(vergil-hover)`, `<Plug>(vergil-close-preview)`, and
+`<Plug>(vergil-hover)`, `<Plug>(vergil-close-preview)`,
 `<Plug>(vergil-send)`, `<Plug>(vergil-send-snippet)` and
-`<Plug>(vergil-send-both)` (Normal and Visual mode).
+`<Plug>(vergil-send-both)` (Normal and Visual mode), the operators
+`<Plug>(vergil-mention)` and `<Plug>(vergil-attach)` (Normal and Visual
+mode), and `<Plug>(vergil-mention-line)` and `<Plug>(vergil-attach-line)`.
 
 `keymaps = { preset = true }` maps these in prompt buffers only:
 
@@ -558,6 +571,7 @@ vergil maps nothing unless you ask. Every action has a `<Plug>` mapping:
 |---|---|
 | `K` | Preview; pressed again, closes it (`preview.on_repeat = "focus"` moves into it instead, as Neovim's own `K` does) |
 | `gs` / `gb` | Snippet from a ranged reference: replace it / keep it and add the lines below |
+| `gm` / `ga` | Make the paths in a motion or selection mentions / attachments; `gmm` / `gaa` the line's. Replaces Neovim's own `gm` and `ga` in prompts |
 | `<C-g>` | Open the picker on what you're typing (Insert mode) or the word or reference under the cursor (Normal mode), and replace it with your choice |
 | `gf` / `<C-w>f` / `<C-w>gf` | Open the reference here / in a split / in a tab; the native key elsewhere |
 | `ZZ` / `ZQ` | `:Vergil submit` / `:Vergil abort` |

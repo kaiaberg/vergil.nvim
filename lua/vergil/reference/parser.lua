@@ -76,7 +76,9 @@ end
 
 --- Single-line code spans: { start = 1-based index of opening run, finish =
 --- 1-based index of closing run's last backtick, ticks = run length }.
-local function code_spans(line)
+---@param line string
+---@return { start: integer, finish: integer, ticks: integer, content: string }[]
+function M.code_spans(line)
   local spans, pos = {}, 1
   while true do
     local s, e = line:find("`+", pos)
@@ -141,7 +143,7 @@ function M.parse(lines, opts)
   local fenced = M.fenced_lines(lines)
   for i, line in ipairs(lines) do
     local row = i - 1
-    local spans = fenced[i] and {} or code_spans(line)
+    local spans = fenced[i] and {} or M.code_spans(line)
     if not fenced[i] then
       local ranged ---@type vergil.Reference? the previous mention, if it has a range
       for _, span in ipairs(spans) do
