@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # End-to-end Ctrl+G handoff test (plan Milestone 6). Drives an interactive
 # `claude` in tmux with vergil as the editor, using a clean Neovim with
-# native completion so the result doesn't depend on a personal config:
+# native completion and the README's Claude Code recipe, so the result
+# doesn't depend on a personal config:
 #   1. @ completion attaches a file
 #   2. @@ completion plus # line selection inserts a ranged mention
 #   3. ZZ (:Vergil submit) hands the prompt back; the transcript must show
@@ -25,7 +26,7 @@ git init -q . 2>/dev/null || true
 cat > "$W/editor.sh" <<SH
 #!/bin/sh
 exec nvim -n --clean --cmd "set rtp^=$REPO" --cmd "set completeopt=menuone,noselect,popup,fuzzy" \\
-  --cmd "lua require('vergil').setup({ completion = { native = true }, keymaps = { preset = true } })" "\$@"
+  --cmd "lua require('vergil').setup({ agents = { claude = dofile('$REPO/tests/recipe.lua')('claude') }, completion = { native = true }, keymaps = { preset = true } })" "\$@"
 SH
 chmod +x "$W/editor.sh"
 

@@ -11,7 +11,7 @@ local M = {}
 ---@field text string
 
 ---@class vergil.ConvertCtx
----@field adapter vergil.Adapter
+---@field attach vergil.AttachSpec? the agent's; nil: it has no attachments
 ---@field mention_format string|vergil.MentionTemplates
 
 local function refuse(ref)
@@ -54,7 +54,13 @@ function M.to_attachment(ref, ctx)
   if ref.mode ~= "mention" then
     return nil, "already an attachment"
   end
-  local attach = formatter.attachment(ref.path, ctx.adapter)
+  if not ctx.attach then
+    return nil, "this agent has no attachments"
+  end
+  local attach = formatter.attachment(ref.path, ctx.attach)
+  if not attach then
+    return nil, "the path needs quoting, and this agent has no quote"
+  end
   if ref.start_line then
     return { span = ref.span, text = attach .. " " .. ref.text }
   end

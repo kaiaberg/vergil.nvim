@@ -1,9 +1,10 @@
 --- Finds references in prompt text and returns their exact spans.
 ---
 --- Grammar:
---- - Attachments use the adapter's syntax and are found everywhere, because
----   the agent doesn't parse Markdown: Claude Code expands `@Override` inside
----   fenced code. They are flagged `in_fence` / `in_code` so callers can skip them.
+--- - Attachments use the agent's `attach` syntax and are found everywhere,
+---   because agents may not parse Markdown (Claude Code expands `@Override`
+---   inside fenced code). They are flagged `in_fence` / `in_code` so callers
+---   can skip them. Without `attach`, there are none.
 --- - Mentions are single-backtick code spans outside fenced code whose content
 ---   parses with the configured mention format. `explicit` is true when the
 ---   content clearly is a path (has a range, a `/`, or a file extension);
@@ -11,6 +12,7 @@
 ---   as a mention when the target exists.
 ---
 --- The parser is pure: it never touches the file system.
+local attachments = require("vergil.reference.attachments")
 local formatter = require("vergil.reference.formatter")
 
 local M = {}
@@ -37,7 +39,7 @@ local M = {}
 ---@field explicit boolean? mention content clearly is a path
 
 ---@class vergil.ParseOpts
----@field adapter vergil.Adapter
+---@field attach vergil.AttachSpec? nil: the agent has no attachments
 ---@field mention_format string|vergil.MentionTemplates
 
 --- Marks which lines are fenced code. Fence delimiters count as fenced.
@@ -110,7 +112,7 @@ local function mention_from(span, row, content, fmt)
     return nil
   end
   -- Prose inside inline code, e.g. `see @a.ts`: the attachment is real
-  -- (Claude Code ignores Markdown), so the span isn't also a mention.
+  -- (agents may ignore Markdown), so the span isn't also a mention.
   if content:find(NOT_PATH) or content:find("%s@") then
     return nil
   end
@@ -162,7 +164,7 @@ function M.parse(lines, opts)
         end
       end
     end
-    for _, a in ipairs(opts.adapter.find_attachments(line)) do
+    for _, a in ipairs(opts.attach and attachments.find(line, opts.attach) or {}) do
       local in_code = false
       for _, span in ipairs(spans) do
         if a.start_col >= span.start and a.start_col < span.finish then
@@ -193,13 +195,13 @@ function M.parse(lines, opts)
   return refs
 end
 
---- Parses a buffer with the current configuration.
+--- Parses a buffer with the current configuration and the buffer's agent.
 ---@param bufnr integer
 ---@return vergil.Reference[]
 function M.parse_buffer(bufnr)
   local config = require("vergil.config")
   return M.parse(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), {
-    adapter = config.adapter(),
+    attach = require("vergil.agents").for_buffer(bufnr).attach,
     mention_format = config.options.mention.format,
   })
 end

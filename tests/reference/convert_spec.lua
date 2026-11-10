@@ -32,13 +32,17 @@ return {
       h.eq(toggle_text(toggle_text(line)), line)
     end
   end,
+  ["to an attachment needs an agent with attachments"] = function()
+    local ref = parser.parse({ "`a.ts`" }, h.opts())[1]
+    h.eq({ convert.toggle(ref, { mention_format = "github" }) }, { nil, "this agent has no attachments" })
+  end,
   ["refuses resources and unterminated quotes"] = function()
     h.eq({ toggle_text("@srv:res") }, { nil, "not a file reference" })
     h.eq({ toggle_text('@"half') }, { nil, "unterminated quoted path" })
   end,
   ["apply replaces exactly the span"] = function()
     local bufnr = h.buffer("convert-apply.md", { "keep  @a.ts\t trailing  ", "line two" })
-    local ref = parser.parse_buffer(bufnr)[1]
+    local ref = parser.parse(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), h.opts())[1]
     convert.apply(bufnr, assert(convert.toggle(ref, h.opts())))
     h.eq(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), { "keep  `a.ts`\t trailing  ", "line two" })
     vim.api.nvim_buf_delete(bufnr, { force = true })

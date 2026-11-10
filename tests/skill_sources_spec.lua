@@ -1,5 +1,13 @@
 local h = require("helpers")
-local skills = require("vergil.adapters.claude.skills")
+local sources = require("vergil.skill_sources")
+local claude = h.recipe("claude").skills
+
+--- Discovery with the README's Claude Code sources.
+local skills = {
+  discover = function(root)
+    return sources.discover(root, claude)
+  end,
+}
 
 local function by_name(list)
   local out = {}
@@ -11,10 +19,10 @@ end
 
 local function with_home(home_files, fn)
   local home = h.tree(home_files)
-  local old_home, old_managed = skills.home, skills.managed_dirs
-  skills.home, skills.managed_dirs = home, {}
+  local old_home = sources.home
+  sources.home = home
   local ok, err = pcall(fn, home)
-  skills.home, skills.managed_dirs = old_home, old_managed
+  sources.home = old_home
   if not ok then
     error(err, 0)
   end
@@ -92,35 +100,46 @@ return {
       h.eq({ s.xlsx.description, s.xlsx.origin }, { "sheets", "synced" })
     end)
   end,
-  ["enabled plugins are namespaced (best effort)"] = function()
+  ["installed plugins are namespaced, disabled ones too (documented)"] = function()
     with_home({
-      [".claude/settings.json"] = '{"enabledPlugins": {"tools@mkt": true, "off@mkt": false}}',
-      [".claude/plugins/known_marketplaces.json"] = "{}",
-      [".claude/plugins/cache/mkt/tools/1.0.0/.claude-plugin/plugin.json"] = '{"name": "tools"}',
       [".claude/plugins/cache/mkt/tools/1.0.0/skills/lint/SKILL.md"] = "---\ndescription: lint it\n---\n",
       [".claude/plugins/cache/mkt/tools/1.0.0/commands/fmt.md"] = "Format.\n",
+      [".claude/plugins/cache/mkt/tools/1.0.0/commands/sub/deep.md"] = "Deep.\n",
       [".claude/plugins/cache/mkt/off/1.0.0/skills/nope/SKILL.md"] = "x\n",
-    }, function(home)
+    }, function()
       local s = by_name(skills.discover(h.tree({ x = "" })))
       h.eq({ s["tools:lint"].description, s["tools:lint"].origin }, { "lint it", "plugin" })
       h.eq(s["tools:fmt"].kind, "command")
-      h.eq(s["off:nope"], nil)
+      h.truthy(s["tools:sub:deep"], vim.inspect(vim.tbl_keys(s)))
+      h.truthy(s["off:nope"], "the cache doesn't say which plugins are enabled")
     end)
   end,
-  ["plugins found through the marketplace manifest"] = function()
-    with_home({}, function(home)
-      local mkt = h.tree({
-        [".claude-plugin/marketplace.json"] = '{"plugins": [{"name": "kit", "source": "./plugins/kit"}]}',
-        ["plugins/kit/skills/go/SKILL.md"] = "---\ndescription: go\n---\n",
-      })
-      vim.fn.mkdir(home .. "/.claude/plugins", "p")
-      vim.fn.writefile(
-        { vim.json.encode({ m = { installLocation = mkt } }) },
-        home .. "/.claude/plugins/known_marketplaces.json"
-      )
-      vim.fn.writefile({ '{"enabledPlugins": {"kit@m": true}}' }, home .. "/.claude/settings.json")
-      h.eq(by_name(skills.discover(h.tree({ x = "" })))["kit:go"].description, "go")
+  ["a name repeated in one source keeps the newest file"] = function()
+    with_home({
+      [".claude/plugins/cache/mkt/tools/1.0.0/skills/lint/SKILL.md"] = "---\ndescription: old\n---\n",
+      [".claude/plugins/cache/mkt/tools/1.1.0/skills/lint/SKILL.md"] = "---\ndescription: new\n---\n",
+    }, function(home)
+      local old = home .. "/.claude/plugins/cache/mkt/tools/1.0.0/skills/lint/SKILL.md"
+      vim.uv.fs_utime(old, 1000, 1000)
+      h.eq(by_name(skills.discover(h.tree({ x = "" })))["tools:lint"].description, "new")
     end)
+  end,
+  ["other sources: path names from the file name, prefixes, origins"] = function()
+    local root = h.tree({
+      ["prompts/review.md"] = "---\ndescription: r\n---\n",
+      ["prompts/nested/skip.md"] = "x\n",
+      ["kit/a/SKILL.md"] = "---\nname: alpha\n---\n",
+    })
+    local s = by_name(sources.discover(root, {
+      { glob = "prompts/*.md", name = "path", prefix = "prompts:" },
+      { glob = "kit/*/SKILL.md", name = "dir", prefix = "{1}-", origin = "kit", kind = "tool" },
+    }))
+    h.eq(
+      { s["prompts:review"].description, s["prompts:review"].origin, s["prompts:review"].kind },
+      { "r", "project", "command" }
+    )
+    h.eq(s["prompts:nested:skip"], nil, "no ** in the glob")
+    h.eq({ s["a-alpha"].origin, s["a-alpha"].kind }, { "kit", "tool" })
   end,
   ["edited files are re-read"] = function()
     with_home({}, function()

@@ -27,8 +27,8 @@ CONTENTS                                                     *vergil-contents*
 ==============================================================================
 1. INTRODUCTION                                                 *vergil-intro*
 
-vergil helps you write prompts for Claude Code in the Neovim instance that
-Claude Code's `Ctrl+G` opens. It completes file references and skills,
+vergil helps you write prompts for coding agents, such as Claude Code, in
+the Neovim instance the agent opens for its prompt (Claude Code's `Ctrl+G`). It completes file references and skills,
 selects exact lines with real Vim motions, inserts verbatim snippets,
 previews and opens references, and flags references that are likely
 mistakes.
@@ -41,29 +41,87 @@ actions use Neovim's usual LSP mappings.
 ==============================================================================
 2. SETUP                                                        *vergil-setup*
 
-Requirements: Neovim 0.11 or newer. Optional: Claude Code, to hand prompts
-over with `Ctrl+G`; a completion engine (blink.cmp, nvim-cmp, or built-in
+Requirements: Neovim 0.11 or newer. Optional: an agent that opens `$EDITOR`
+for its prompt, such as Claude Code; a completion engine (blink.cmp, nvim-cmp, or built-in
 completion); ripgrep, fd or git for file discovery; and a Nerd Font for
 completion icons.
 
-Claude Code opens `$VISUAL` before `$EDITOR`, so set: >sh
+Most agents, Claude Code among them, open `$VISUAL` before `$EDITOR`, so
+set: >sh
   export VISUAL=nvim
 <
-vergil works without |vergil.setup()|. It turns itself on in buffers whose
-file name matches `claude-prompt-*.md` (only the name is checked, not the
-directory) and nowhere else. Use |:Vergil-enable| for other buffers.
+vergil knows no agent by itself. It turns on only in prompt files one of
+your |vergil-agents| matches, and with |:Vergil-enable| anywhere else.
 
-The project root is the directory Neovim started in, which is where Claude
-Code runs. It is captured once and survives |:cd|. Set `root` to override it.
+The project root is the directory Neovim started in, which is where the
+agent runs. It is captured once and survives |:cd|. Set `root` to override it.
 
                                                        *vergil-ahead-of-time*
 vergil doesn't need a running agent. To draft prompts or a plan in advance,
-run |:Vergil-enable| in any Markdown buffer, or add file names to
-`activation.filename_patterns`, e.g. `{ "claude-prompt-*.md", "*.prompt.md" }`.
+run |:Vergil-enable| in any Markdown buffer, or add file names to an agent's
+`match`, e.g. `{ "claude-prompt-*.md", "*.prompt.md" }`.
 Start Neovim in the project the prompt is for, since paths are relative to
 the root.
 
 Run |:checkhealth| `vergil` to check the setup.
+
+                                                              *vergil-agents*
+`agents` in |vergil.setup()| describes each agent: which prompt files are
+its, how it writes attachments, and where its `/` commands live. The README
+has copyable recipes (Claude Code, checked by vergil's contract tests; Codex
+CLI, an unverified sketch). A prompt file gets the first agent, by name,
+whose `match` covers it, so several agents work side by side. >lua
+  require("vergil").setup({
+    agents = {
+      mytool = {
+        name = "My tool",           -- shown in :checkhealth
+        executable = "mytool",      -- optional: version in :checkhealth
+        match = { "mytool-*.md" },  -- globs, see below
+        attach = { prefix = "@", quote = '"', strip = ".,;:" },
+        skills = { { glob = ".mytool/skills/*/SKILL.md", name = "dir" } },
+      },
+    },
+  })
+<
+`match`     Globs for the files the agent opens for its prompt. Without a
+            `/`, matched on the file name; with one, on the full path (a
+            relative one at any depth). `:echo expand("%:p")` in the editor
+            shows the file. Required.
+`attach`    How the agent loads a file into the prompt. Leave it out for an
+            agent that only reads paths: `@` and `@@` then insert mentions,
+            and the attachment diagnostics and `<C-t>` toggle are off.
+            `prefix`  starts an attachment at line start or after
+                      whitespace, e.g. "@". Required.
+            `quote`   one character around paths with spaces, e.g. '"';
+                      without it, such files are mentioned instead.
+            `strip`   characters the agent drops from the end of an
+                      unquoted path, e.g. ".,;:!?".
+            `ranges`  "ignored" when `@a.lua#L5` still loads the whole
+                      file, so vergil hints at it.
+`skills`    Sources for the `/` menu, read in order; the first item of a
+            name wins, the rest show as overridden in hover. Each source:
+            `glob`    a relative glob is searched in the root and its
+                      parents up to the repository root; `~` and absolute
+                      ones once. Required.
+            `name`    "dir": the frontmatter `name`, else the file's
+                      directory. "path": the path from the first `**` on
+                      (else the file name), without `.md`, `/` as `:`.
+            `prefix`  put before the name; `{n}` is what the n-th wildcard
+                      matched, e.g. "{2}:".
+            `on_clash` prefix for a name that is already taken, instead
+                      of skipping it.
+            `origin`, `kind`  shown in hover; default from the glob
+                      (project, personal, system) and `name` (skill,
+                      command).
+            Within one source, a repeated name keeps the newest file.
+`name`, `executable`  Shown in |:checkhealth|.
+
+`agents.<name> = false` turns one off. Without agents, nothing turns on by
+itself; vergil says so once and |:checkhealth| warns.
+
+Agents change faster than vergil, and these formats aren't promised by the
+agents. If references or `/` look off after an agent update, adjust the
+field above that describes it.
 
 ==============================================================================
 3. REFERENCES: ATTACH AND MENTION                          *vergil-references*
@@ -245,18 +303,16 @@ aren't listed; nested symbols are qualified, e.g. `Session.enable`.
 ==============================================================================
 6. SKILLS AND COMMANDS                                         *vergil-skills*
 
-`/` lists skills and commands from:
-- the project: `.claude/skills/<name>/SKILL.md` and `.claude/commands/**.md`
-  in the root and every parent up to the repository root,
-- your personal `~/.claude`, and the managed settings directory,
-- synced claude.ai skills, and enabled plugins (best effort, as
-  `/<plugin>:<name>`),
-- `skills.extra_items` from your configuration, e.g. built-ins like /compact.
+`/` lists skills and commands from the prompt's agent's `skills` sources
+(see |vergil-agents|), then `skills.extra_items` from your configuration,
+e.g. built-ins like /compact. With the README's Claude Code recipe, that is
+`.claude/skills/<name>/SKILL.md` and `.claude/commands/**.md` in the project,
+the same under `~/.claude` and the managed settings directory, synced
+claude.ai skills, and installed plugins as `/<plugin>:<name>` (disabled ones
+too: the plugin cache doesn't say which are on).
 
-A skill's command is its frontmatter `name`, else its directory name;
-`commands/sub/deep.md` is `/sub:deep`. On a name clash a skill beats a
-command, and personal beats project; hover lists what an item overrides.
-Without a description, the first line of the body is shown. Accepting
+On a name clash the earlier source wins; hover lists what an item
+overrides. Without a description, the first line of the body is shown. Accepting
 inserts the command only. Hover (`K`) and go-to-definition (`gd`) work on
 `/skill` in the prompt.
 
@@ -394,9 +450,11 @@ files.
     Settle other modified buffers, write the prompt back as it was, and
     exit with an error, which restores the previous prompt.
 
-:Vergil enable                                           *:Vergil-enable*
+:Vergil enable [{agent}]                                 *:Vergil-enable*
 :Vergil disable                                         *:Vergil-disable*
-    Turn vergil on or off in the current buffer.
+    Turn vergil on or off in the current buffer. {agent} is a name under
+    |vergil-agents|; without it, the agent whose `match` covers the buffer,
+    else `plain`: mentions only, no attachments or `/` menu.
 
 ==============================================================================
 11. MAPPINGS                                                 *vergil-mappings*
@@ -450,9 +508,8 @@ selector's keys (`selector.keys`):
                                                               *vergil.setup()*
 Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
   require("vergil").setup({
-    agent = "claude",
+    agents = {},
     root = nil,
-    activation = { filename_patterns = nil }, -- nil: { "claude-prompt-*.md" }
     mention = { format = "github", symbols = true },
     triggers = { attach = "@", mention = "@@", range = "#", skills = "/" },
     skills = { extra_items = {} },
@@ -479,13 +536,13 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
     },
   })
 <
-`setup()` raises an error for invalid values and an unknown `agent`, and
+`setup()` raises an error for invalid values, including unknown agent
+fields, and
 warns about option names it doesn't know (e.g. a typo like `keymap`);
 |:checkhealth| lists those too.
 
+`agents`                Your agents. See |vergil-agents|.
 `root`                  Project root. Default: Neovim's startup directory.
-`activation.filename_patterns`
-                        File-name globs that turn vergil on.
 `mention.format`        "github", "colon", or templates such as
                         `{ single = "{path}#L{start}",`
                         `  range = "{path}#L{start}-L{end}" }`. A template
@@ -584,8 +641,10 @@ Lua API: `require("vergil")`
 15. TROUBLESHOOTING                                   *vergil-troubleshooting*
 
 Nothing happens when typing `@`
-  Check `:echo b:vergil_enabled`, that Claude Code opens Neovim (it prefers
-  `$VISUAL` over `$EDITOR`), and that a completion engine is active.
+  Check `:echo b:vergil_enabled`, that an agent's `match` covers the file
+  (|vergil-agents|; `:echo expand("%:p")` shows it), that the agent opens
+  Neovim (most prefer `$VISUAL` over `$EDITOR`), and that a completion
+  engine is active.
 
 `Ctrl+G` does nothing
   If the editor fails to start, Claude Code silently keeps the prompt. Run

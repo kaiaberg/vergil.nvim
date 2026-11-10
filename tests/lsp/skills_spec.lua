@@ -1,5 +1,5 @@
 local h = require("helpers")
-local adapter_skills = require("vergil.adapters.claude.skills")
+local sources = require("vergil.skill_sources")
 
 local home = h.tree({ [".claude/skills/girl-dinner/SKILL.md"] = "---\ndescription: Dinner helper\n---\n" })
 local root = h.tree({
@@ -9,10 +9,10 @@ local root = h.tree({
 })
 
 local function with_env(fn)
-  local old_home, old_managed = adapter_skills.home, adapter_skills.managed_dirs
-  adapter_skills.home, adapter_skills.managed_dirs = home, {}
+  local old_home = sources.home
+  sources.home = home
   local ok, err = pcall(fn)
-  adapter_skills.home, adapter_skills.managed_dirs = old_home, old_managed
+  sources.home = old_home
   if not ok then
     error(err, 0)
   end

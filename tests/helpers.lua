@@ -22,9 +22,39 @@ function M.errors(fn, pattern)
   end
 end
 
---- Parse options with the Claude adapter and a given mention format.
+local repo = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
+
+--- An agent recipe from the README, so the tests run what users copy.
+M.recipe = dofile(repo .. "/tests/recipe.lua")
+
+--- The agents the tests run with: the README's Claude Code recipe.
+function M.agents()
+  return { claude = M.recipe("claude") }
+end
+
+--- Parse options with the Claude Code recipe's attachments and a given
+--- mention format.
 function M.opts(fmt)
-  return { adapter = require("vergil.adapters.claude"), mention_format = fmt or "github" }
+  return {
+    attach = require("vergil.agents").normalize("claude", M.recipe("claude")).attach,
+    mention_format = fmt or "github",
+  }
+end
+
+-- Specs set only the options they test (setup(), config.set()); give them
+-- the Claude Code recipe unless they pass `agents` themselves.
+do
+  local config = require("vergil.config")
+  local set = config.set
+  config.set = function(opts, ...)
+    opts = opts or {}
+    if opts.agents == nil then
+      opts = vim.tbl_extend("force", opts, { agents = M.agents() })
+    end
+    return set(opts, ...)
+  end
+  -- And the defaults, for specs that never call setup().
+  require("vergil.config").options.agents = M.agents()
 end
 
 --- A temporary directory tree: files = { ["a/b.ts"] = "content" }.
@@ -72,8 +102,7 @@ end
 
 function M.load_plugin()
   if not vim.g.loaded_vergil then
-    local root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
-    vim.cmd.source(root .. "/plugin/vergil.lua")
+    vim.cmd.source(repo .. "/plugin/vergil.lua")
   end
 end
 

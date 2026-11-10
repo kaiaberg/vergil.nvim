@@ -52,7 +52,10 @@ end
 ---@return table[]
 function M.handle(params, session)
   local uri = params.textDocument.uri
-  local ctx = { adapter = config.adapter(), mention_format = config.options.mention.format }
+  local ctx = {
+    attach = require("vergil.agents").for_buffer(session.bufnr).attach,
+    mention_format = config.options.mention.format,
+  }
   local fixable = {}
   for _, d in ipairs(params.context and params.context.diagnostics or {}) do
     if d.source == diagnostics.source and diagnostics.fixable[d.code] then

@@ -145,14 +145,15 @@ local function build(ranked, token, ctx)
   local items = {}
   local attached = attached_keys(ctx.bufnr, ctx.root, token, ctx.row)
   local fmt = config.options.mention.format
-  local adapter = config.adapter()
+  local attach = ctx.agent.attach
   local range = {
     start = { line = ctx.row, character = token.start_col },
     ["end"] = { line = ctx.row, character = token.end_col },
   }
   for i, path in ipairs(ranked) do
-    local text = token.mode == "mention" and formatter.mention(path, nil, nil, fmt)
-      or formatter.attachment(path, adapter)
+    -- Without attachments (or a quote for this path), `@` inserts a mention.
+    local text = token.mode == "attach" and attach and formatter.attachment(path, attach)
+      or formatter.mention(path, nil, nil, fmt)
     if text then
       local st = path:sub(-1) ~= "/" and vim.uv.fs_stat(resolver.absolute(path, ctx.root))
       local detail = st and human_size(st.size) or ""
@@ -190,7 +191,7 @@ local KIND_KEYWORD = 14
 local function skill_items(token, ctx)
   local skills = require("vergil.skills")
   local trigger = config.options.triggers.skills
-  local all = skills.items(ctx.root)
+  local all = skills.items(ctx.root, ctx.agent)
   local by_name = {}
   local names = {}
   for _, it in ipairs(all) do
@@ -254,10 +255,20 @@ function M.handle(params, session, respond)
     if not skill_token then
       return respond(EMPTY)
     end
-    local ctx = { root = session.root, row = row, typed = line:sub(skill_token.start_col + 1, col) }
+    local agent = require("vergil.agents").for_buffer(bufnr)
+    if not require("vergil.skills").enabled(agent) then
+      return respond(EMPTY)
+    end
+    local ctx = { root = session.root, row = row, agent = agent, typed = line:sub(skill_token.start_col + 1, col) }
     return respond({ isIncomplete = true, items = skill_items(skill_token, ctx) })
   end
-  local ctx = { bufnr = bufnr, root = session.root, row = row, typed = line:sub(token.start_col + 1, col) }
+  local ctx = {
+    bufnr = bufnr,
+    root = session.root,
+    row = row,
+    agent = require("vergil.agents").for_buffer(bufnr),
+    typed = line:sub(token.start_col + 1, col),
+  }
   local dir, name = files.outside_query(token.query)
   if dir then
     local paths = files.list_dir(dir, name)

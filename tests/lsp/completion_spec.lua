@@ -117,4 +117,13 @@ return {
     h.eq(vim.tbl_contains(completion.trigger_characters(), "+"), true)
     require("vergil").setup({ root = root })
   end,
+  ["an agent without attach: @ and @@ insert mentions, / lists nothing"] = function()
+    local bufnr, client = h.prompt(root, { "see @sess" })
+    require("vergil").setup({ root = root, agents = { claude = { match = { "claude-prompt-*.md" } } } })
+    local res = h.request(client, bufnr, "textDocument/completion", 0, 9)
+    h.eq(res.items[1].textEdit.newText, "`src/auth/session.ts`")
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "/" })
+    h.eq(h.request(client, bufnr, "textDocument/completion", 0, 1).items, {})
+    require("vergil").setup({ root = root })
+  end,
 }

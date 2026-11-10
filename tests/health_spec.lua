@@ -77,27 +77,27 @@ return {
     vim.g.strip_whitespace_on_save = nil
     h.truthy(text:find("WARN vim-better-whitespace strips trailing whitespace on save", 1, true), text)
   end,
-  ["compares the agent's version with the verified one"] = function()
+  ["lists each agent, with its version when installed"] = function()
     h.load_plugin()
-    local verified = require("vergil.config").adapter().verified_version
-    local same = with_agent(verified, report)
-    h.truthy(same:find("## Agent: Claude Code", 1, true), same)
-    h.truthy(same:find("OK vergil's assumptions about Claude Code were checked with this version", 1, true), same)
-    local other = with_agent("9.9.9", report)
-    -- Informational, not a warning: most agent updates change nothing.
-    h.truthy(
-      other:find(
-        "INFO vergil's assumptions about Claude Code were last checked with " .. verified .. "; you have 9.9.9",
-        1,
-        true
-      ),
-      other
-    )
+    local text = with_agent("2.1.400", report)
+    h.truthy(text:find("## Agent: Claude Code", 1, true), text)
+    h.truthy(text:find("INFO Activates on: claude-prompt-*.md", 1, true), text)
+    h.truthy(text:find('INFO Attachments: @path, @"path with spaces"', 1, true), text)
+    h.truthy(text:find("OK `claude` is on PATH (2.1.400)", 1, true), text)
   end,
-  ["says nothing about the agent when it isn't installed"] = function()
+  ["an agent that isn't installed is fine"] = function()
     local text = with_agent(nil, report)
-    h.truthy(text:find("## Prompt safety", 1, true), text)
-    h.eq(text:find("## Agent", 1, true), nil, text)
+    h.truthy(text:find("INFO `claude` is not on PATH", 1, true), text)
     h.eq(text:find("\nERROR", 1, true), nil, text)
+  end,
+  ["warns without agents, and says what a mentions-only agent does"] = function()
+    local config = require("vergil.config")
+    config.set({ agents = {} })
+    local none = report()
+    config.set({ agents = { x = { match = { "x-*.md" } } } })
+    local plain = report()
+    config.set({})
+    h.truthy(none:find("WARN No agents configured", 1, true), none)
+    h.truthy(plain:find("INFO No attachments: files are inserted as mentions", 1, true), plain)
   end,
 }

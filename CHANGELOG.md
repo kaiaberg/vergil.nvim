@@ -6,6 +6,38 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** vergil no longer knows any agent by itself. Define your
+  agents under `agents` in `setup()`: which prompt files are theirs
+  (`match`), how they write attachments (`attach`), and where their `/`
+  commands live (`skills`). The README has a recipe for Claude Code, the
+  one vergil's contract tests check, and an unverified sketch for Codex
+  CLI. To keep the previous behaviour:
+
+  ```lua
+  require("vergil").setup({
+    agents = { claude = { … } }, -- the README's Claude Code recipe
+  })
+  ```
+
+  Without agents, nothing turns on by itself; vergil says so once and
+  `:checkhealth vergil` warns.
+- **Breaking:** `agent` and `activation.filename_patterns` are gone and
+  fail at setup with a pointer to `:help vergil-agents`; use an agent's
+  `match` instead.
+- Each prompt gets its own agent, so several agents work side by side.
+  `:Vergil enable [agent]` picks one; without a match, `plain` has
+  mentions only.
+- An agent without `attach` gets mentions from `@` and `@@`, no
+  attach/mention toggle in the picker, and no attachment diagnostics;
+  without `skills`, no `/` menu and no Skills tab.
+- Claude Code plugin skills now come from the plugin cache, so disabled
+  plugins are listed too; the marketplace manifests aren't read anymore.
+- `:checkhealth vergil` lists each agent with its match rules, what it
+  supports and its installed version. It no longer compares that version
+  with a verified one; the recipe says what it was last checked with.
+
 ## [0.3.0] - 2026-11-09
 
 One picker with tabs, built into vergil, for files, changed files,

@@ -179,16 +179,16 @@ return {
     h.truthy(h.request(client, bufnr, "textDocument/hover", 0, 2).contents)
   end,
   ["an unreadable skills directory doesn't break / completion"] = function()
-    local skills = require("vergil.adapters.claude.skills")
+    local skills = require("vergil.skill_sources")
     local home = h.tree({
       [".claude/skills/ok/SKILL.md"] = "---\ndescription: fine\n---\n",
       [".claude/skills/locked/SKILL.md"] = "x",
     })
     vim.uv.fs_chmod(home .. "/.claude/skills/locked", 0)
-    local old_home, old_managed = skills.home, skills.managed_dirs
-    skills.home, skills.managed_dirs = home, {}
-    local ok, items = pcall(skills.discover, h.tree({ x = "" }))
-    skills.home, skills.managed_dirs = old_home, old_managed
+    local old_home = skills.home
+    skills.home = home
+    local ok, items = pcall(skills.discover, h.tree({ x = "" }), h.recipe("claude").skills)
+    skills.home = old_home
     vim.uv.fs_chmod(home .. "/.claude/skills/locked", 493)
     h.truthy(ok, tostring(items))
     h.truthy(vim.tbl_contains(
@@ -225,6 +225,6 @@ return {
     }, script)
     local res = vim.system({ vim.v.progpath, "--clean", "--headless", "-l", script }, { text = true }):wait(10000)
     h.eq(res.code, 0, res.stderr)
-    h.eq(res.stdout, "vergil.config vergil.keymaps vergil.picker.kinds vergil.session")
+    h.eq(res.stdout, "vergil.agents vergil.config vergil.keymaps vergil.picker.kinds vergil.session")
   end,
 }

@@ -10,7 +10,7 @@ local M = {}
 ---@class vergil.Session
 ---@field bufnr integer
 ---@field root string
----@field agent string
+---@field agent string key of the buffer's agent under `agents`, or "plain"
 ---@field jump { row: integer, col: integer, abs: string }? reference last opened with `gd` or `:Vergil open` (0-based)
 
 local sessions = {} ---@type table<integer, vergil.Session>
@@ -31,21 +31,11 @@ function M.root()
   return vim.fs.normalize(config.options.root or startup_root)
 end
 
---- Whether a buffer name's file name (not its directory) matches the
---- activation patterns.
+--- The agent whose `match` rules cover a buffer name, if any.
 ---@param name string
----@return boolean
+---@return vergil.Agent?
 function M.matches(name)
-  local tail = vim.fs.basename(name)
-  if tail == "" then
-    return false
-  end
-  for _, pattern in ipairs(config.filename_patterns()) do
-    if vim.regex(vim.fn.glob2regpat(pattern)):match_str(tail) then
-      return true
-    end
-  end
-  return false
+  return require("vergil.agents").match(name)
 end
 
 ---@param bufnr integer
@@ -88,15 +78,24 @@ function M.find_prompt()
   return found
 end
 
---- Enables vergil in a buffer. Idempotent.
+--- Enables vergil in a buffer. Idempotent. The agent is `agent` (a key
+--- under `agents`), else the one matching the buffer's name, else "plain".
 ---@param bufnr integer
+---@param agent string?
 ---@return vergil.Session
-function M.enable(bufnr)
+function M.enable(bufnr, agent)
   bufnr = bufnr == 0 and vim.api.nvim_get_current_buf() or bufnr
   if sessions[bufnr] then
+    if agent then
+      sessions[bufnr].agent = agent
+    end
     return sessions[bufnr]
   end
-  local session = { bufnr = bufnr, root = M.root(), agent = config.options.agent }
+  if not agent then
+    local matched = M.matches(vim.api.nvim_buf_get_name(bufnr))
+    agent = matched and matched.key or require("vergil.agents").plain.key
+  end
+  local session = { bufnr = bufnr, root = M.root(), agent = agent }
   sessions[bufnr] = session
   if originals[bufnr] == nil then
     local name = vim.api.nvim_buf_get_name(bufnr)
@@ -128,11 +127,13 @@ function M.disable(bufnr)
   vim.api.nvim_exec_autocmds("User", { pattern = "VergilDisable", data = { bufnr = bufnr }, modeline = false })
 end
 
---- Enables vergil when a buffer's file name matches. Used by autocommands.
+--- Enables vergil when an agent's `match` covers the buffer's name. Used by
+--- autocommands.
 ---@param bufnr integer
 function M.maybe_enable(bufnr)
-  if vim.bo[bufnr].buftype == "" and M.matches(vim.api.nvim_buf_get_name(bufnr)) then
-    M.enable(bufnr)
+  local agent = vim.bo[bufnr].buftype == "" and M.matches(vim.api.nvim_buf_get_name(bufnr))
+  if agent then
+    M.enable(bufnr, agent.key)
   end
 end
 

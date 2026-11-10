@@ -6,9 +6,8 @@ local M = {}
 ---@field range string template for a range, e.g. "{path}#L{start}-L{end}"
 
 ---@class vergil.Config
----@field agent string adapter name under `vergil.adapters`
+---@field agents table<string, table|false> agent definitions (see `vergil.agents`); false turns one off
 ---@field root string? explicit session root; defaults to Neovim's startup cwd
----@field activation { filename_patterns: string[]? } nil patterns = adapter default
 ---@field mention { format: "github"|"colon"|vergil.MentionTemplates, symbols: boolean }
 ---@field triggers { attach: string, mention: string, range: string, skills: string } completion and selector triggers
 ---@field skills { extra_items: { name: string, description: string?, argument_hint: string? }[] }
@@ -23,9 +22,10 @@ local M = {}
 
 ---@type vergil.Config
 M.defaults = {
-  agent = "claude",
+  -- Which prompt files vergil activates in, and each agent's syntax. Empty:
+  -- vergil only runs on `:Vergil enable`. See :help vergil-agents.
+  agents = {},
   root = nil,
-  activation = { filename_patterns = nil },
   -- symbols: add the function or class name after a range that covers
   -- exactly one, e.g. `a.lua#L3-L9` (`M.apply`), so drift can be flagged.
   mention = { format = "github", symbols = true },
@@ -93,7 +93,6 @@ M.options = vim.deepcopy(M.defaults)
 -- removed ones that `:checkhealth` reports on its own.
 local KNOWN_NIL = {
   root = true,
-  ["activation.filename_patterns"] = true,
   ["files.command"] = true,
   ["picker.backend"] = true,
 }
@@ -121,28 +120,28 @@ function M.unknown(opts)
   return out
 end
 
---- Agents with an adapter under `lua/vergil/adapters/`.
----@return string[]
-function M.agents()
-  local out = {}
-  for _, path in ipairs(vim.api.nvim_get_runtime_file("lua/vergil/adapters/*/init.lua", true)) do
-    out[#out + 1] = vim.fn.fnamemodify(path, ":h:t")
-  end
-  table.sort(out)
-  return vim.fn.uniq(out)
-end
-
 ---@param opts table?
 ---@param quiet boolean? don't warn about unknown options (`:checkhealth` lists them)
 function M.set(opts, quiet)
   opts = opts or {}
   vim.validate("opts", opts, "table")
-  vim.validate("agent", opts.agent, "string", true)
-  if opts.agent and not vim.tbl_contains(M.agents(), opts.agent) then
-    error(("vergil: unknown agent %q; expected %s"):format(opts.agent, table.concat(M.agents(), ", ")), 0)
+  for _, old in ipairs({ "agent", "activation" }) do
+    if opts[old] ~= nil then
+      error(
+        ("vergil: `%s` was removed in 0.4; define your agents under `agents` instead (see :help vergil-agents)"):format(
+          old
+        ),
+        0
+      )
+    end
+  end
+  vim.validate("agents", opts.agents, "table", true)
+  for key, spec in pairs(opts.agents or {}) do
+    if spec ~= false then
+      require("vergil.agents").validate(key, spec)
+    end
   end
   vim.validate("root", opts.root, "string", true)
-  vim.validate("activation", opts.activation, "table", true)
   vim.validate("mention", opts.mention, "table", true)
   if opts.mention then
     vim.validate("mention.symbols", opts.mention.symbols, "boolean", true)
@@ -241,9 +240,6 @@ function M.set(opts, quiet)
       error(("vergil: triggers.%s must be non-empty without whitespace"):format(k), 0)
     end
   end
-  if opts.activation then
-    vim.validate("activation.filename_patterns", opts.activation.filename_patterns, "table", true)
-  end
   local unknown = not quiet and M.unknown(opts) or {}
   if #unknown > 0 then
     vim.notify(
@@ -260,14 +256,25 @@ function M.set(opts, quiet)
   M.options = merged
 end
 
----@return vergil.Adapter
-function M.adapter()
-  return require("vergil.adapters." .. M.options.agent)
-end
+--- Where the "no agents" notice records that it was shown.
+M.notice_file = vim.fs.joinpath(vim.fn.stdpath("state"), "vergil", "no-agents-notice")
 
----@return string[]
-function M.filename_patterns()
-  return M.options.activation.filename_patterns or M.adapter().filename_patterns
+--- Once per user, not per Neovim: without agents nothing activates, which
+--- looks like vergil is broken. Skipped headless (nobody would read it).
+function M.notice_no_agents()
+  if next(M.options.agents) ~= nil or #vim.api.nvim_list_uis() == 0 then
+    return
+  end
+  if vim.uv.fs_stat(M.notice_file) then
+    return
+  end
+  vim.fn.mkdir(vim.fs.dirname(M.notice_file), "p")
+  pcall(vim.fn.writefile, {}, M.notice_file)
+  vim.notify(
+    "vergil: no agents are configured, so no prompt activates vergil. "
+      .. "Add one under `agents` in setup() (see :help vergil-agents), or use :Vergil enable.",
+    vim.log.levels.INFO
+  )
 end
 
 return M

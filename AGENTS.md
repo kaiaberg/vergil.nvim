@@ -6,8 +6,9 @@ commit style, and they all apply here.
 ## Direction
 
 - vergil should stay lean and work with any coding agent that hands its
-  prompt to `$EDITOR`, not only Claude Code. The core stays agent-neutral,
-  and anything specific to one agent goes in `lua/vergil/adapters/<agent>/`.
+  prompt to `$EDITOR`, not only Claude Code. The code knows no agent:
+  users define agents under `agents` in their config, and anything
+  specific to one agent goes in its README recipe, phrased defensively.
 - Don't assume how an agent will behave. Agent CLIs change often, so
   docs and code should rely only on what the contract tests check
   (`docs/m0-findings.md` records those results).

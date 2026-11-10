@@ -122,21 +122,22 @@ function M.restore(ctx, row, end_col)
   end)
 end
 
---- Text to insert for a chosen item.
+--- Text to insert for a chosen item. A file the agent can't attach (it has
+--- no `attach`, or the path needs a quote it lacks) becomes a mention.
 ---@param kind "attach"|"mention"|"skills"|"commits"
 ---@param value any
+---@param agent vergil.Agent
 ---@return string?
-function M.text_for(kind, value)
+function M.text_for(kind, value, agent)
   if kind == "skills" then
     return config.options.triggers.skills .. value.name .. " "
   elseif kind == "commits" then
     return require("vergil.git").reference(value)
   elseif kind == "branches" then
     return require("vergil.git").branch_reference(value)
-  elseif kind == "mention" then
-    return formatter.mention(value, nil, nil, config.options.mention.format)
   end
-  return formatter.attachment(value, config.adapter())
+  local attach = kind == "attach" and agent.attach and formatter.attachment(value, agent.attach)
+  return attach or formatter.mention(value, nil, nil, config.options.mention.format)
 end
 
 local function read_head(abs, max)
@@ -165,7 +166,7 @@ end
 --- Builds the tabs for a session, in `picker.tabs` order.
 ---@return vergil.PickerTab[] tabs
 ---@return string? git_err why the git tabs are missing
-local function build_tabs(session)
+local function build_tabs(session, agent)
   local root = session.root
   local keep = self_filter(session.bufnr, root)
   local git = require("vergil.git")
@@ -173,6 +174,7 @@ local function build_tabs(session)
   for _, name in ipairs(config.options.picker.tabs) do
     enabled[name] = true
   end
+  enabled.skills = enabled.skills and require("vergil.skills").enabled(agent)
   -- Git data loads in the background, once per picker and only when a tab
   -- needs it, so opening the picker never waits on git. Whether the root is
   -- in a repository is known without running git.
@@ -255,7 +257,7 @@ local function build_tabs(session)
     return vim.tbl_map(function(s)
       local text = trigger .. s.name .. (s.description and ("  " .. s.description) or "")
       return { id = "skill:" .. s.name, text = text, label = s.kind, kind = "skills", value = s }
-    end, require("vergil.skills").items(root))
+    end, require("vergil.skills").items(root, agent))
   end
   local function commit_items(commits)
     return vim.tbl_map(function(c)
@@ -303,13 +305,13 @@ local function build_tabs(session)
 
   local specs = {
     files = { key = "files", name = "Files", load = file_items },
-    skills = {
+    skills = enabled.skills and {
       key = "skills",
       name = "Skills",
       load = function(cb)
         cb(skill_items())
       end,
-    },
+    } or nil,
   }
   if in_repo then
     specs.changed = { key = "changed", name = "Changed", load = git_tab("changed", changed_items) }
@@ -446,7 +448,8 @@ function M.pick(kind, opts)
   if not session then
     return false, "not enabled in this buffer (use :Vergil enable)"
   end
-  local tabs, git_err = build_tabs(session)
+  local agent = require("vergil.agents").for_buffer(bufnr)
+  local tabs, git_err = build_tabs(session, agent)
   local start
   for i, t in ipairs(tabs) do
     if t.key == tab_key then
@@ -488,7 +491,7 @@ function M.pick(kind, opts)
     ctx.row, ctx.col, ctx.end_col = opts.replace.row, opts.replace.start_col, opts.replace.end_col
   end
 
-  local state = { mode = kind == "mention" and "mention" or "attach", sep = 1 }
+  local state = { mode = (kind == "mention" or not agent.attach) and "mention" or "attach", sep = 1 }
   local keys = vim.tbl_extend("force", M.default_keys, config.options.picker.keys or {})
   local function has_files(t)
     return t.key == "all" or t.key == "files" or t.key == "changed"
@@ -534,7 +537,7 @@ function M.pick(kind, opts)
   ---@return vergil.PickerMarkInfo
   local function mark_info(item)
     local mode = item.kind == "file" and state.mode or item.kind
-    local text = vim.trim(M.text_for(mode, item.value) or "")
+    local text = vim.trim(M.text_for(mode, item.value, agent) or "")
     local sign = ({ attach = "@", mention = "`", skills = "/", commits = "◆", branches = "⎇" })[mode] or "•"
     local label = (
       { attach = "attach", mention = "mention", skills = "skill", commits = "commit", branches = "branch" }
@@ -554,7 +557,7 @@ function M.pick(kind, opts)
       local join_hint = key_hint("separator")
       local parts = {}
       if has_files(current) then
-        local switch = key_hint("toggle_mode")
+        local switch = agent.attach and key_hint("toggle_mode")
         parts[#parts + 1] = (state.mode == "mention" and "Mention" or "Attach")
           .. (switch and (" (%s: %s)"):format(switch, state.mode == "mention" and "attach" or "mention") or "")
       else
@@ -583,7 +586,9 @@ function M.pick(kind, opts)
       {
         keys = keys.toggle_mode,
         desc = "attach/mention",
-        when = has_files,
+        when = function(t)
+          return agent.attach ~= nil and has_files(t)
+        end,
         fn = function(p)
           state.mode = state.mode == "attach" and "mention" or "attach"
           p.refresh()
@@ -798,6 +803,12 @@ function M.attach_trigger(bufnr)
       local char = vim.v.char
       if char ~= triggers.attach:sub(1, 1) and char ~= triggers.skills then
         return
+      end
+      if
+        char == triggers.skills
+        and not require("vergil.skills").enabled(require("vergil.agents").for_buffer(bufnr))
+      then
+        return -- no `/` menu for this agent: `/` is just text
       end
       local row, col = unpack(vim.api.nvim_win_get_cursor(0))
       local before = vim.api.nvim_get_current_line():sub(col, col)

@@ -65,6 +65,19 @@ local function prompt(text, col, name, setup)
 end
 
 return {
+  ["an agent without attach or skills: mentions, no toggle, no Skills tab"] = function()
+    local b = prompt("look", 3, "pick-plain", { agents = { claude = { match = { "claude-prompt-*.md" } } } })
+    open("attach")
+    local names = vim.tbl_map(function(t)
+      return t.name
+    end, ui.current().opts.tabs)
+    h.eq(vim.tbl_contains(names, "Skills"), false, table.concat(names, ","))
+    local title = vim.api.nvim_win_get_config(ui.current().wins.prompt).title[1][1]
+    h.truthy(title:find("Mention", 1, true) and not title:find("C-t", 1, true), title)
+    feed("Aa.lua<C-t><CR>")
+    h.eq(line(b), "look `src/a.lua`")
+    require("vergil").setup({ root = root })
+  end,
   ["Files: type to filter, Enter attaches after the cursor"] = function()
     local b = prompt("look", 3)
     open("attach")

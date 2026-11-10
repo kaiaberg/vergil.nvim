@@ -152,7 +152,7 @@ function M.skill_at(session, row, col)
   if not tok then
     return nil
   end
-  local skill = skills.find(session.root, tok.name)
+  local skill = skills.find(session.root, tok.name, require("vergil.agents").for_buffer(session.bufnr))
   if not skill then
     return nil
   end

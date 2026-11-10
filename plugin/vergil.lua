@@ -42,6 +42,19 @@ end
 
 require("vergil.keymaps").define_plugs()
 
+-- After the user's setup() has had its chance (lazy loaders call it right
+-- after sourcing this file).
+local function notice()
+  vim.schedule(function()
+    require("vergil.config").notice_no_agents()
+  end)
+end
+if vim.v.vim_did_enter == 1 then
+  notice()
+else
+  vim.api.nvim_create_autocmd("VimEnter", { group = group, once = true, callback = notice })
+end
+
 vim.api.nvim_create_user_command("Vergil", function(opts)
   require("vergil.commands").run(opts)
 end, {

@@ -52,7 +52,8 @@ return {
       fmt.compile({ single = "{path}:{start}", range = "{path}:{end}-{start}" })
     end, "before {end}")
   end,
-  ["attachment delegates to the adapter"] = function()
-    h.eq(fmt.attachment("my file", require("vergil.adapters.claude")), '@"my file"')
+  ["attachment uses the agent's syntax"] = function()
+    h.eq(fmt.attachment("my file", h.opts().attach), '@"my file"')
+    h.eq(fmt.attachment("my file", { prefix = "+", strip = "" }), nil, "needs a quote it doesn't have")
   end,
 }

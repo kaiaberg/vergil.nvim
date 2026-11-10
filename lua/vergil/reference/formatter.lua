@@ -132,12 +132,13 @@ function M.parse_mention(content, fmt)
   return content, nil, nil
 end
 
---- Attachment text, in the adapter's syntax.
+--- Attachment text, in the agent's syntax; nil when it can't be written
+--- (the path needs a quote the agent doesn't have).
 ---@param path string
----@param adapter vergil.Adapter
----@return string
-function M.attachment(path, adapter)
-  return adapter.attachment(path)
+---@param spec vergil.AttachSpec
+---@return string?
+function M.attachment(path, spec)
+  return require("vergil.reference.attachments").format(path, spec)
 end
 
 --- A mention followed by the symbol it covers: `` `a.lua#L3-L9` (`M.apply`) ``.

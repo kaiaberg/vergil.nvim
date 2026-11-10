@@ -1,6 +1,6 @@
 --- Skills and commands for `/` completion, hover and definition.
---- Discovery is the adapter's job; this merges in configured extra items and
---- finds `/name` tokens in prompt text.
+--- Discovery reads the agent's skill sources (`vergil.skill_sources`); this
+--- merges in configured extra items and finds `/name` tokens in prompt text.
 local config = require("vergil.config")
 
 local M = {}
@@ -10,19 +10,26 @@ local M = {}
 ---@field description string?
 ---@field argument_hint string? display only
 ---@field kind "skill"|"command"|"builtin"
----@field origin string "project", "personal", "enterprise", "plugin", "synced" or "config"
+---@field origin string "project", "personal", "system", "config", or a source's own `origin`
 ---@field path string? definition file
 ---@field user_invocable boolean
 ---@field model_invocable boolean
 ---@field shadows vergil.Skill[]? same-named definitions this one beats
 
---- All items for a root: discovered ones, then configured extras whose name
---- isn't taken.
+--- Whether an agent has a `/` menu: skill sources or configured extras.
+---@param agent vergil.Agent
+---@return boolean
+function M.enabled(agent)
+  return agent.skills ~= nil or #config.options.skills.extra_items > 0
+end
+
+--- All items for a root and agent: discovered ones, then configured extras
+--- whose name isn't taken.
 ---@param root string
+---@param agent vergil.Agent
 ---@return vergil.Skill[]
-function M.items(root)
-  local adapter = config.adapter()
-  local items = adapter.discover_skills and adapter.discover_skills(root) or {}
+function M.items(root, agent)
+  local items = agent.skills and require("vergil.skill_sources").discover(root, agent.skills) or {}
   local taken = {}
   for _, it in ipairs(items) do
     taken[it.name] = true
@@ -47,9 +54,10 @@ end
 
 ---@param root string
 ---@param name string
+---@param agent vergil.Agent
 ---@return vergil.Skill?
-function M.find(root, name)
-  for _, it in ipairs(M.items(root)) do
+function M.find(root, name, agent)
+  for _, it in ipairs(M.items(root, agent)) do
     if it.name == name then
       return it
     end

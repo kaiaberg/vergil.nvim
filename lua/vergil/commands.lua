@@ -7,8 +7,13 @@ end
 
 ---@type table<string, fun(args: string[], opts: table)>
 M.subcommands = {
-  enable = function()
-    require("vergil.session").enable(0)
+  enable = function(args)
+    local agents = require("vergil.agents")
+    local key = args[1]
+    if key and key ~= agents.plain.key and not agents.get(key) then
+      return notify(("no agent %q under `agents` (see :help vergil-agents)"):format(key), vim.log.levels.WARN)
+    end
+    require("vergil.session").enable(0, key)
   end,
   disable = function()
     require("vergil.session").disable(0)
@@ -129,6 +134,16 @@ function M.complete(arglead, cmdline)
     return vim.tbl_filter(function(n)
       return vim.startswith(n, arglead)
     end, { "split", "vsplit", "tab" })
+  end
+  if cmdline:match("^%s*%S+%s+enable%s+%S*$") then
+    local agents = require("vergil.agents")
+    local keys = vim.tbl_map(function(a)
+      return a.key
+    end, agents.list())
+    keys[#keys + 1] = agents.plain.key
+    return vim.tbl_filter(function(n)
+      return vim.startswith(n, arglead)
+    end, keys)
   end
   if cmdline:match("^%s*%S+%s+pick%s+%S*$") then
     return vim.tbl_filter(function(n)

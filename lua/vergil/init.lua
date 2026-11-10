@@ -199,7 +199,10 @@ function M.toggle()
   end
   local config = require("vergil.config")
   local convert = require("vergil.reference.convert")
-  local edit, err = convert.toggle(ref, { adapter = config.adapter(), mention_format = config.options.mention.format })
+  local edit, err = convert.toggle(ref, {
+    attach = require("vergil.agents").for_buffer(bufnr).attach,
+    mention_format = config.options.mention.format,
+  })
   if not edit then
     return false, err
   end

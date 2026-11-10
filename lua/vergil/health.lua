@@ -28,9 +28,7 @@ local function check_config()
     health.warn("Unknown options: " .. table.concat(unknown, ", "), "Check for typos; see :help vergil-config")
   end
   local session = require("vergil.session")
-  health.info("Agent: " .. config.options.agent)
   health.info("Session root: " .. session.root() .. (config.options.root and " (configured)" or " (startup directory)"))
-  health.info("Activates on: " .. table.concat(config.filename_patterns(), ", "))
   local enabled = vim.tbl_filter(session.is_enabled, vim.api.nvim_list_bufs())
   health.info(("Enabled in %d buffer%s"):format(#enabled, #enabled == 1 and "" or "s"))
 end
@@ -139,7 +137,7 @@ local function check_prompt_safety()
     end
   end
   if vim.o.fixendofline and not vim.o.endofline then
-    health.info("'fixendofline' adds a final newline on save; harmless for Claude Code")
+    health.info("'fixendofline' adds a final newline on save; usually harmless for agents")
   end
   if problems == 0 then
     health.ok("No format-on-save or whitespace trimming found")
@@ -160,43 +158,50 @@ function M.agent_version(exe)
   return (res.stdout or ""):match("%d+%.%d+%.%d+")
 end
 
---- Agents change faster than vergil; say which version its assumptions
---- (syntax, size limits, exit codes) were last checked against.
-local function check_agent_version(adapter)
-  local exe = adapter.executable
-  local name = adapter.display_name or adapter.name
-  local installed = M.agent_version(exe)
-  health.ok(("`%s` is on PATH%s"):format(exe, installed and (" (" .. installed .. ")") or ""))
-  local verified = adapter.verified_version
-  if not (verified and installed) then
-    return
-  end
-  if installed == verified then
-    health.ok(("vergil's assumptions about %s were checked with this version"):format(name))
-  else
-    health.info(
-      ("vergil's assumptions about %s were last checked with %s; you have %s. "):format(name, verified, installed)
-        .. 'Usually nothing changes; if references or diagnostics look off, see "Observed behaviour" in the README.'
+--- One section per configured agent: what activates it, what it supports,
+--- and its version when the executable is installed. vergil works without
+--- the agent installed, e.g. to write prompts ahead of time.
+local function check_agents()
+  local agents = require("vergil.agents").list()
+  if #agents == 0 then
+    health.start("Agents")
+    health.warn(
+      "No agents configured: no prompt file activates vergil (only :Vergil enable)",
+      "Add your agents under `agents` in setup(); see :help vergil-agents and the README's recipes"
     )
-  end
-end
-
---- Only when the agent is installed: vergil works without it, for example
---- to write prompts or plans ahead of time.
-local function check_agent()
-  local adapter = require("vergil.config").adapter()
-  if not (adapter.executable and vim.fn.executable(adapter.executable) == 1) then
     return
   end
-  health.start("Agent: " .. (adapter.display_name or adapter.name))
-  check_agent_version(adapter)
+  for _, a in ipairs(agents) do
+    health.start("Agent: " .. a.name)
+    health.info("Activates on: " .. table.concat(a.match, ", "))
+    local at = a.attach
+    if at then
+      local quoted = at.quote and (", %s%spath with spaces%s"):format(at.prefix, at.quote, at.quote) or ""
+      health.info(("Attachments: %spath%s"):format(at.prefix, quoted))
+    else
+      health.info("No attachments: files are inserted as mentions")
+    end
+    if a.skills then
+      local n = #require("vergil.skills").items(require("vergil.session").root(), a)
+      health.info(("Skills: %d from %d source%s"):format(n, #a.skills, #a.skills == 1 and "" or "s"))
+    end
+    if a.executable then
+      if vim.fn.executable(a.executable) == 1 then
+        local installed = M.agent_version(a.executable)
+        health.ok(("`%s` is on PATH%s"):format(a.executable, installed and (" (" .. installed .. ")") or ""))
+      else
+        health.info(("`%s` is not on PATH"):format(a.executable))
+      end
+    end
+  end
   local visual, editor = vim.env.VISUAL, vim.env.EDITOR
   local used = (visual and visual ~= "") and ("$VISUAL=" .. visual)
     or (editor and editor ~= "") and ("$EDITOR=" .. editor)
+  health.start("Editor")
   if used then
-    health.info("Ctrl+G opens " .. used .. " (Claude Code prefers $VISUAL over $EDITOR)")
+    health.info("Agents open " .. used .. " (most prefer $VISUAL over $EDITOR)")
   else
-    health.warn("Neither $VISUAL nor $EDITOR is set", "Set VISUAL=nvim so Claude Code's Ctrl+G opens Neovim")
+    health.warn("Neither $VISUAL nor $EDITOR is set", "Set VISUAL=nvim so your agent opens Neovim for prompts")
   end
 end
 
@@ -216,7 +221,7 @@ function M.check()
   check_completion()
   check_picker()
   check_prompt_safety()
-  check_agent()
+  check_agents()
 end
 
 return M
