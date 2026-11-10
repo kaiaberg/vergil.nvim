@@ -49,6 +49,13 @@ All notable changes are documented here. The format follows
   supports and its installed version. It no longer compares that version
   with a verified one; the recipe says what it was last checked with.
 
+### Fixed
+
+- `:Vergil enable` in a buffer without a name (e.g. plain `nvim`) used to
+  report success while completion, hover and diagnostics did nothing, as
+  LSP can't address an unnamed buffer. It now refuses with a hint to name
+  the buffer first (`:file draft.md`).
+
 ## [0.3.0] - 2026-11-09
 
 One picker with tabs, built into vergil, for files, changed files,

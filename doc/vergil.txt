@@ -461,6 +461,8 @@ files.
     Turn vergil on or off in the current buffer. {agent} is a name under
     |vergil-agents|; without it, the agent whose `match` covers the buffer,
     else `plain`: mentions only, no attachments or `/` menu.
+    The buffer needs a file name, which LSP uses to address it; in an
+    unnamed buffer, name it first, e.g. `:file draft.md`.
 
 ==============================================================================
 11. MAPPINGS                                                 *vergil-mappings*

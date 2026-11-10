@@ -312,7 +312,9 @@ either one is enough.
 vergil doesn't need a running agent. To draft prompts or an execution plan
 in advance, open any Markdown file and run `:Vergil enable`: completion,
 line selection, snippets, previews and diagnostics all work
-(`:Vergil enable claude` for that agent's attachments and `/` menu). To
+(`:Vergil enable claude` for that agent's attachments and `/` menu). The
+buffer needs a file name; it doesn't have to exist yet (`nvim draft.md`, or
+`:file draft.md` in an empty Neovim). To
 switch on automatically, add your own file names to an agent's `match`:
 
 ```lua

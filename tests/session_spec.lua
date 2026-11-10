@@ -87,6 +87,26 @@ return {
     h.eq(session.get(c).agent, "claude")
     require("vergil").setup({})
   end,
+  [":Vergil enable refuses an unnamed buffer with a hint"] = function()
+    vim.cmd.enew()
+    local b = vim.api.nvim_get_current_buf()
+    local warned, notify = {}, vim.notify
+    vim.notify = function(msg, level)
+      if level == vim.log.levels.WARN then
+        warned[#warned + 1] = msg
+      end
+    end
+    local ok, err = pcall(vim.cmd, "Vergil enable")
+    vim.notify = notify
+    assert(ok, err)
+    h.eq(session.is_enabled(b), false)
+    h.eq(vim.b[b].vergil_enabled, nil)
+    h.eq(warned, { "vergil: this buffer has no name; name it first, e.g. :file draft.md" })
+    vim.cmd.file(vim.fn.fnameescape(vim.fn.tempname() .. "-draft.md"))
+    vim.cmd("Vergil enable")
+    h.eq(session.is_enabled(b), true, "works once named")
+    vim.cmd("bwipeout!")
+  end,
   ["setup validates options"] = function()
     h.errors(function()
       require("vergil").setup({ mention = { format = "nope" } })

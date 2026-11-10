@@ -13,6 +13,11 @@ M.subcommands = {
     if key and key ~= agents.plain.key and not agents.get(key) then
       return notify(("no agent %q under `agents` (see :help vergil-agents)"):format(key), vim.log.levels.WARN)
     end
+    -- LSP addresses buffers by file name, and every unnamed buffer gets the
+    -- same empty `file://` URI, so the server could never find this one.
+    if vim.api.nvim_buf_get_name(0) == "" then
+      return notify("this buffer has no name; name it first, e.g. :file draft.md", vim.log.levels.WARN)
+    end
     require("vergil.session").enable(0, key)
   end,
   disable = function()
