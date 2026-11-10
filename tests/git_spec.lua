@@ -150,7 +150,7 @@ return {
     local b = prompt_in(top, { "Review" }, "git-many")
     vim.api.nvim_win_set_cursor(0, { 1, 5 })
     open("changed")
-    feed("<Tab><Down><Down><Tab><CR>")
+    feed("<Tab><Down><Down><Tab><C-o><CR>") -- <C-o>: joined by spaces
     h.eq(text(b), { "Review @a.lua @sub/s.lua" }) -- Tab marks and moves down
   end,
   ["inserting mid-line keeps words apart"] = function()
@@ -158,7 +158,7 @@ return {
     local b = prompt_in(top, { "Review this" }, "git-mid")
     vim.api.nvim_win_set_cursor(0, { 1, 0 })
     open("changed")
-    feed("<Tab><Tab><CR>")
+    feed("<Tab><Tab><C-o><CR>") -- <C-o>: joined by spaces
     h.eq(text(b), { "Review @a.lua @c.lua this" }) -- after the word, not inside it
   end,
   [":Vergil diff inserts all uncommitted changes as a diff block"] = function()
@@ -258,7 +258,7 @@ return {
     vim.api.nvim_buf_set_lines(b, 0, -1, false, { "Both:" })
     vim.api.nvim_win_set_cursor(0, { 1, 4 })
     open("commits")
-    feed("<Tab><Tab><CR>")
+    feed("<Tab><Tab><C-o><CR>") -- <C-o>: joined by spaces
     h.truthy(text(b)[1]:match("^Both: `%x+` %(Second%) `%x+` %(init%)$"), text(b)[1])
 
     vim.api.nvim_buf_set_lines(b, 0, -1, false, { "What changed?" })
@@ -353,7 +353,7 @@ return {
     feed("<Tab>")
     local marks = vim.api.nvim_buf_get_lines(ui.current().bufs.marks, 0, -1, false)
     h.truthy(marks[2]:match("^◆ `%x+` %(init%)%s+commit$"), marks[2])
-    feed("<CR>")
+    feed("<C-o><CR>") -- <C-o>: joined by spaces
     h.truthy(text(b)[1]:match("^@a%.lua `%x+` %(init%)$"), text(b)[1])
   end,
   ["Branches tab: current first, inserted with (branch), <C-d> diffs since the split"] = function()

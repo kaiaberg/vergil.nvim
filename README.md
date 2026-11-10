@@ -375,7 +375,7 @@ directory itself, mark it with `<Tab>` first.
 | `<C-g>` then `1`…`9` | go to a tab |
 | `<M-1>`…`<M-9>` | go to a tab, where the terminal sends them (`<C-1>`… too, with CSI u) |
 | `<C-t>` | switch between attaching and mentioning files (for the next marks) |
-| `<C-o>` | join several items with spaces, commas, or one per line |
+| `<C-o>` | join several items one per line (default), with spaces, or with commas |
 | `<C-r>` | select lines of the file |
 | `<C-d>` | insert a commit's diff |
 | `<C-f>` / `<C-b>` | scroll the preview |
@@ -398,6 +398,12 @@ per tab, any other is a prefix followed by the tab's number: the default is
 
 `picker.on_trigger = true` opens the picker as soon as you type `@` or `/`
 where a reference can start, instead of the inline menu.
+
+The picker remembers your join (`<C-o>`) and attach/mention (`<C-t>`)
+choices for next time, also in the next prompt, once you insert something.
+`picker.remember = "always"` also keeps them when you close it, `"never"`
+starts from the defaults each time. `@`, `@@` and `:Vergil pick attach` or
+`mention` set the mode for that picker only.
 
 ## Git
 
@@ -579,6 +585,7 @@ require("vergil").setup({
     on_trigger = false, -- open the picker on @ and / instead of inline completion
     keys = {}, -- e.g. { next_tab = { "<C-l>" }, prev_tab = { "<C-h>" } }
     tabs = { "all", "files", "changed", "branches", "commits", "skills" }, -- order; leave out to drop
+    remember = "confirm", -- keep the join and attach/mention choices: "confirm", "always" or "never"
   },
   preview = { on_repeat = "close" }, -- K (preset) again: "close" the preview, or "focus" it
   diagnostics = {

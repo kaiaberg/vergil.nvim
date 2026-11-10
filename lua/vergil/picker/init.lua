@@ -33,10 +33,41 @@ M.default_keys = {
 
 --- How several items are joined, in the order `<C-o>` cycles through them.
 M.separators = {
-  { key = "space", sep = " ", label = "spaces" },
-  { key = "comma", sep = ", ", label = "commas" },
-  { key = "lines", sep = "\n", label = "one per line" },
+  { key = "space", sep = " ", label = "joined by spaces" },
+  { key = "comma", sep = ", ", label = "joined by commas" },
+  { key = "lines", sep = "\n", label = "joined one per line" },
 }
+M.default_separator = "lines"
+
+--- Where the join and attach/mention choices are kept between pickers
+--- (`picker.remember`). On disk, since each prompt is a new Neovim.
+M.state_file = vim.fs.joinpath(vim.fn.stdpath("state"), "vergil", "picker.json")
+
+---@return { mode: "attach"|"mention"?, sep: string? }
+local function load_remembered()
+  local ok, lines = pcall(vim.fn.readfile, M.state_file)
+  if not ok then
+    return {}
+  end
+  local ok2, data = pcall(vim.json.decode, table.concat(lines, "\n"))
+  return ok2 and type(data) == "table" and data or {}
+end
+
+---@param data { mode: "attach"|"mention"?, sep: string? }
+local function save_remembered(data)
+  pcall(function()
+    vim.fn.mkdir(vim.fs.dirname(M.state_file), "p")
+    vim.fn.writefile({ vim.json.encode(data) }, M.state_file)
+  end)
+end
+
+local function separator_index(key)
+  for i, s in ipairs(M.separators) do
+    if s.key == key then
+      return i
+    end
+  end
+end
 
 local TAB_FOR = {
   all = "all",
@@ -491,7 +522,25 @@ function M.pick(kind, opts)
     ctx.row, ctx.col, ctx.end_col = opts.replace.row, opts.replace.start_col, opts.replace.end_col
   end
 
-  local state = { mode = (kind == "mention" or not agent.attach) and "mention" or "attach", sep = 1 }
+  -- `@` and `@@` (and `:Vergil pick attach|mention`) ask for a mode; other
+  -- tabs start with the remembered one. The join is always remembered.
+  local remember = config.options.picker.remember
+  local saved = remember ~= "never" and load_remembered() or {}
+  local explicit = kind == "attach" or kind == "mention"
+  local mode = explicit and kind or (saved.mode == "mention" and "mention" or "attach")
+  local state = {
+    mode = agent.attach and mode or "mention",
+    sep = separator_index(saved.sep) or separator_index(M.default_separator),
+    mode_chosen = not explicit, -- worth remembering: not just what `@@` asked for
+  }
+  local function remember_state()
+    local data = load_remembered()
+    data.sep = M.separators[state.sep].key
+    if agent.attach and state.mode_chosen then
+      data.mode = state.mode
+    end
+    save_remembered(data)
+  end
   local keys = vim.tbl_extend("force", M.default_keys, config.options.picker.keys or {})
   local function has_files(t)
     return t.key == "all" or t.key == "files" or t.key == "changed"
@@ -563,7 +612,7 @@ function M.pick(kind, opts)
       else
         parts[#parts + 1] = current.name
       end
-      parts[#parts + 1] = "joined by " .. join .. (join_hint and (" (%s)"):format(join_hint) or "")
+      parts[#parts + 1] = join .. (join_hint and (" (%s)"):format(join_hint) or "")
       return table.concat(parts, " · ")
     end,
     preview = function(item)
@@ -591,6 +640,7 @@ function M.pick(kind, opts)
         end,
         fn = function(p)
           state.mode = state.mode == "attach" and "mention" or "attach"
+          state.mode_chosen = true
           p.refresh()
         end,
       },
@@ -652,6 +702,9 @@ function M.pick(kind, opts)
       },
     },
     on_confirm = function(marks)
+      if remember ~= "never" then
+        remember_state()
+      end
       local texts = {}
       for _, m in ipairs(marks) do
         if m.info.data.text ~= "" then
@@ -663,13 +716,19 @@ function M.pick(kind, opts)
       end
       local sep = M.separators[state.sep]
       local text = table.concat(texts, sep.sep)
-      -- Ready for a skill's arguments, unless each item has its own line.
-      if marks[#marks].info.data.kind == "skills" and sep.key ~= "lines" then
+      -- Ready for a skill's arguments, unless several items each have their
+      -- own line.
+      if marks[#marks].info.data.kind == "skills" and (sep.key ~= "lines" or #texts == 1) then
         text = text .. " "
       end
       M.insert(ctx, text)
     end,
-    on_cancel = resume,
+    on_cancel = function()
+      if remember == "always" then
+        remember_state()
+      end
+      resume()
+    end,
   })
   return true
 end

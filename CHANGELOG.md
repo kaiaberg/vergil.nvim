@@ -6,8 +6,19 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `picker.remember`: the picker keeps your join (`<C-o>`) and
+  attach/mention (`<C-t>`) choices for the next picker, also in the next
+  prompt. `"confirm"` (default) keeps them when you insert something,
+  `"always"` also when you close the picker, `"never"` starts from the
+  defaults. A mode asked for with `@`, `@@` or `:Vergil pick attach|mention`
+  isn't remembered on its own.
+
 ### Changed
 
+- The picker joins several items one per line by default (was spaces).
+  A single skill still gets a space after it, ready for arguments.
 - **Breaking:** vergil no longer knows any agent by itself. Define your
   agents under `agents` in `setup()`: which prompt files are theirs
   (`match`), how they write attachments (`attach`), and where their `/`

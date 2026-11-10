@@ -227,8 +227,8 @@ completion (|vergil-completion|). <CR> on a directory opens it; mark it with
                             (<C-1>.. too, with CSI u)
   <C-t>                     Switch between attaching and mentioning files,
                             for the next marks
-  <C-o>                     Join several items with spaces, commas, or one
-                            per line
+  <C-o>                     Join several items one per line (default),
+                            with spaces, or with commas
   <C-r>                     Select lines of the file
   <C-d>                     Insert a commit's diff
   <C-f> <C-b>               Scroll the preview
@@ -247,6 +247,12 @@ number. The default is `{ "<C-g>", "<M-%d>", "<C-%d>" }`; `{ "<C-g>" }`
 keeps only the prefix.
 `picker.on_trigger = true` opens the picker on `@` and `/` instead of the
 inline menu.
+
+`picker.remember` keeps the join (<C-o>) and attach/mention (<C-t>) choices
+for the next picker, also in the next prompt: `"confirm"` (default) when you
+insert something, `"always"` also when you close it, `"never"` to start
+from the defaults each time. A mode asked for with `@`, `@@` or
+`:Vergil pick attach|mention` applies to that picker only.
 
 ==============================================================================
 5. LINE SELECTION AND SNIPPETS                       *vergil-lines* *vergil-#*
@@ -524,6 +530,7 @@ Call `require("vergil").setup(opts)` once; it's optional. Defaults: >lua
     picker = {
       on_trigger = false, keys = {},
       tabs = { "all", "files", "changed", "branches", "commits", "skills" },
+      remember = "confirm",
     },
     preview = { on_repeat = "close" },
     diagnostics = {

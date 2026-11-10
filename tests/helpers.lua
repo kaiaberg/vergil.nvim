@@ -51,8 +51,14 @@ do
     if opts.agents == nil then
       opts = vim.tbl_extend("force", opts, { agents = M.agents() })
     end
+    -- Each spec starts from the picker's defaults, not the last spec's choices.
+    if not (opts.picker and opts.picker.remember) then
+      opts = vim.tbl_deep_extend("force", opts, { picker = { remember = "never" } })
+    end
     return set(opts, ...)
   end
+  require("vergil.picker").state_file = vim.fn.tempname()
+  config.options.picker.remember = "never"
   -- And the defaults, for specs that never call setup().
   require("vergil.config").options.agents = M.agents()
 end

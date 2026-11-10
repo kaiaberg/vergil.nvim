@@ -15,7 +15,7 @@ local M = {}
 ---@field completion { native: boolean, reopen_on_backspace: boolean }
 ---@field files { command: string[]? } custom discovery command, run in the root
 ---@field keymaps { preset: boolean } opt-in buffer-local mappings in prompt buffers
----@field picker { on_trigger: boolean, keys: table<string, string[]>, tabs: string[] }
+---@field picker { on_trigger: boolean, keys: table<string, string[]>, tabs: string[], remember: "never"|"confirm"|"always" }
 ---@field preview { on_repeat: "close"|"focus" }
 ---@field return_to_prompt boolean `:q` in a file opened from the prompt returns to the prompt
 ---@field diagnostics { attachment_token_warning: integer, severity: table<string, "error"|"warn"|"info"|"hint"|false> }
@@ -59,11 +59,14 @@ M.defaults = {
   -- completion. keys: override the picker's keys, e.g.
   -- { next_tab = { "<C-l>" }, prev_tab = { "<C-h>" } }.
   -- tabs: which tabs the picker has, in this order; leave one out to drop it
-  -- (from All too).
+  -- (from All too). remember: keep the join and attach/mention choices for
+  -- the next picker: "confirm" (when you insert something), "always" (also
+  -- when you close it) or "never".
   picker = {
     on_trigger = false,
     keys = {},
     tabs = { "all", "files", "changed", "branches", "commits", "skills" },
+    remember = "confirm",
   },
   -- `K` (preset) or `:Vergil preview` while the preview is open: "close" it,
   -- or "focus" it (move into it, as Neovim's own `K` does).
@@ -180,6 +183,11 @@ function M.set(opts, quiet)
     vim.validate("picker.on_trigger", opts.picker.on_trigger, "boolean", true)
     vim.validate("picker.keys", opts.picker.keys, "table", true)
     vim.validate("picker.tabs", opts.picker.tabs, "table", true)
+    if opts.picker.remember ~= nil then
+      vim.validate("picker.remember", opts.picker.remember, function(v)
+        return v == "never" or v == "confirm" or v == "always"
+      end, '"never", "confirm" or "always"')
+    end
     local known = { all = true, files = true, changed = true, branches = true, commits = true, skills = true }
     local seen = {}
     for _, name in ipairs(opts.picker.tabs or {}) do
