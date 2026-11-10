@@ -49,6 +49,7 @@ local function publish(dispatchers, uri)
   if session then
     local ok, res = pcall(require("vergil.lsp.diagnostics").compute, session)
     diags = ok and res or {}
+    pcall(require("vergil.status").update, session)
   end
   dispatchers.notification("textDocument/publishDiagnostics", { uri = uri, diagnostics = diags })
 end

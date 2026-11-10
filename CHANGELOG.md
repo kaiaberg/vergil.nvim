@@ -8,6 +8,14 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Prompt status data for your status line: `vim.b.vergil_status` holds the
+  number of attachments, their size and estimated tokens, mentions, missing
+  files, paths left to convert, references outside the root and an
+  estimated total, updated after each change, with a `User VergilStatus`
+  event and `require("vergil").status()`. vergil draws nothing itself; the
+  README has lualine, heirline and winbar examples.
+- `require("vergil").format_size(bytes)`.
+
 - Mentions keep their lines in either built-in form, whatever
   `mention.format` is: `` `a.ts:12` `` and `` `a.ts:3-9` `` no longer read
   as missing files under the default `github` format, and `` `a.ts:12:5` ``
@@ -35,6 +43,8 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Sizes read the same everywhere (`68.4 KB`, was `68 KB` in the
+  large-attachment note), and go up to GB.
 - The picker joins several items one per line by default (was spaces).
   A single skill still gets a space after it, ready for arguments.
 - **Breaking:** vergil no longer knows any agent by itself. Define your

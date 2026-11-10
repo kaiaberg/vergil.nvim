@@ -12,7 +12,7 @@ local M = {}
 local DELIM = "[%s%(%)%[%]{}<>\"'`,;|]"
 
 --- A run of characters between delimiters, with its 1-based start.
-local WORD = "()[^%s%(%)%[%]{}<>\"'`,;|]+"
+local WORD = "()([^%s%(%)%[%]{}<>\"'`,;|]+)"
 
 --- Trailing characters that end a sentence rather than belong to the path.
 local TRAILING = "[%.:!?]+$"
@@ -24,6 +24,26 @@ local TRAILING = "[%.:!?]+$"
 ---@field start_col integer 0-based byte column
 ---@field end_col integer 0-based exclusive byte column
 ---@field text string
+
+--- A candidate from a delimited word starting at 1-based byte `s`.
+---@param word string
+---@param s integer
+---@param fmt string|vergil.MentionTemplates
+---@return vergil.BareCandidate?
+local function finish(word, s, fmt)
+  local text = word:gsub(TRAILING, "")
+  if text == "" or text:sub(1, 1) == "@" then
+    return nil -- `@` belongs to an attachment, whatever the agent writes
+  end
+  local path, first, last = text, nil, nil
+  if text:find("%d") then -- a range needs a digit; most words have none
+    path, first, last = formatter.parse_mention(text, fmt)
+    if path == "" or (first and last and last < first) then
+      return nil
+    end
+  end
+  return { path = path, start_line = first, end_line = last, start_col = s - 1, end_col = s - 1 + #text, text = text }
+end
 
 --- The bare path candidate around a byte column of a line. Pure: it never
 --- touches the file system.
@@ -51,16 +71,7 @@ function M.candidate(line, col, fmt)
   while e < #line and not line:sub(e + 1, e + 1):match(DELIM) do
     e = e + 1
   end
-  local text = line:sub(s, e):gsub(TRAILING, "")
-  if text == "" or text:sub(1, 1) == "@" then
-    return nil -- `@` belongs to an attachment, whatever the agent writes
-  end
-  e = s + #text - 1
-  local path, first, last = formatter.parse_mention(text, fmt)
-  if path == "" or (first and last and last < first) then
-    return nil
-  end
-  return { path = path, start_line = first, end_line = last, start_col = s - 1, end_col = e, text = text }
+  return finish(line:sub(s, e), s, fmt)
 end
 
 --- Every candidate on a line that starts in a byte range, outside inline
@@ -73,7 +84,7 @@ end
 function M.candidates(line, first, last, fmt)
   local code = require("vergil.reference.parser").code_spans(line)
   local out = {}
-  for s in line:gmatch(WORD) do
+  for s, word in line:gmatch(WORD) do
     local col = s - 1
     local in_code = false
     for _, span in ipairs(code) do
@@ -83,7 +94,7 @@ function M.candidates(line, first, last, fmt)
       end
     end
     if col >= first and col < last and not in_code then
-      out[#out + 1] = M.candidate(line, col, fmt)
+      out[#out + 1] = finish(word, s, fmt)
     end
   end
   return out

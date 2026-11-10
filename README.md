@@ -27,6 +27,7 @@ holds the conversation.
 - [Previews and navigation](#previews-and-navigation)
 - [Diagnostics](#diagnostics)
 - [Handing the prompt back](#handing-the-prompt-back)
+- [Status line](#status-line)
 - [Writing prompts ahead of time](#writing-prompts-ahead-of-time)
 - [The picker](#the-picker)
 - [Git](#git)
@@ -327,6 +328,81 @@ asks what to do with other files you changed, and never discards them
 silently. `:Vergil abort` (or `ZQ`) restores the prompt from before
 `Ctrl+G`: it writes the original text back and exits with an error, so
 either one is enough.
+
+## Status line
+
+vergil draws no status line of its own. It keeps numbers about the prompt in
+`vim.b.vergil_status` (set in prompt buffers only) and fires `User
+VergilStatus` after each change, so you can show them in the status line you
+already use:
+
+| Field | Meaning |
+|---|---|
+| `agent` | The buffer's agent, by its name under `agents` |
+| `attachments` | Distinct attached files and directories that exist |
+| `attachment_bytes` | Their total size (directories count 0) |
+| `attachment_tokens` | Estimated tokens of those files |
+| `mentions` | Mentions of existing files or directories |
+| `missing` | References whose file doesn't exist |
+| `to_convert` | Bare paths `]f` would visit ([Attach or mention?](#attach-or-mention)) |
+| `outside_root` | References to files outside the project root |
+| `prompt_tokens` | Estimated tokens of the prompt text |
+| `tokens` | `prompt_tokens` + `attachment_tokens` |
+
+The token numbers are rough (a third of the bytes) and only good for
+comparing. `require("vergil").format_size(bytes)` writes sizes the way vergil
+does (`1.5 KB`). vergil's warnings are diagnostics, so your status line's
+diagnostics component already shows them.
+
+lualine:
+
+```lua
+local function vergil()
+  local s = vim.b.vergil_status
+  return ("@%d %s · `%d · ~%dk tokens"):format(
+    s.attachments, require("vergil").format_size(s.attachment_bytes), s.mentions, math.floor(s.tokens / 1000))
+end
+
+require("lualine").setup({
+  sections = {
+    lualine_x = { { vergil, cond = function() return vim.b.vergil_status ~= nil end } },
+  },
+})
+```
+
+heirline:
+
+```lua
+local Vergil = {
+  condition = function() return vim.b.vergil_status ~= nil end,
+  update = { "User", pattern = "VergilStatus" },
+  provider = function()
+    local s = vim.b.vergil_status
+    return ("%d attached · %d mentioned · %d missing"):format(s.attachments, s.mentions, s.missing)
+  end,
+}
+```
+
+Without a status line plugin, in the window bar of prompt buffers:
+
+```lua
+function _G.vergil_winbar()
+  local s = vim.b.vergil_status
+  if not s then
+    return ""
+  end
+  return ("%d attached (%s) · %d mentioned · ~%d tokens"):format(
+    s.attachments, require("vergil").format_size(s.attachment_bytes), s.mentions, s.tokens)
+end
+
+vim.api.nvim_create_autocmd("User", {
+  pattern = "VergilEnable",
+  callback = function()
+    vim.opt_local.winbar = "%{v:lua.vergil_winbar()}"
+  end,
+})
+vim.api.nvim_create_autocmd("User", { pattern = "VergilStatus", command = "redrawstatus" })
+```
 
 ## Writing prompts ahead of time
 

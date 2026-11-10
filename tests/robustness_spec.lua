@@ -120,6 +120,25 @@ return {
     h.eq(#refs, 10000)
     h.truthy(t < 250 * FACTOR, ("parse took %.1f ms"):format(t))
   end,
+  ["the status of a 50 KB prompt is computed fast"] = function()
+    local root = h.tree({ ["src/a.lua"] = "x\n" })
+    local lines = {}
+    for i = 1, 400 do
+      lines[#lines + 1] = ("line %d with prose, src/f%d.lua:%d and src/a.lua plus @src/a.lua and `src/b.md` e.g. v0.11"):format(
+        i,
+        i,
+        i
+      )
+    end
+    local b = h.prompt(root, lines, "status-perf")
+    local session = require("vergil.session").get(b)
+    local st
+    local t = ms(function()
+      st = require("vergil.status").compute(session)
+    end)
+    h.eq({ st.to_convert, st.attachments, st.missing }, { 400, 1, 400 })
+    h.truthy(t < 100 * FACTOR, ("status took %.1f ms"):format(t))
+  end,
 
   -- Error handling ----------------------------------------------------------
   ["unreadable, deleted and broken-symlink targets don't break hover or diagnostics"] = function()

@@ -25,7 +25,7 @@ local M = {}
 ---@param last integer
 ---@param fmt string|vergil.MentionTemplates
 ---@return vergil.Reference[]
-local function bare_refs(line, row, refs, first, last, fmt)
+function M.bare_refs(line, row, refs, first, last, fmt)
   local out = {}
   for _, c in ipairs(bare.candidates(line, first, last, fmt)) do
     local overlaps = false
@@ -48,7 +48,7 @@ end
 ---@param fmt string|vergil.MentionTemplates
 ---@return table<integer, vergil.Reference[]> by_row 0-based rows
 ---@return boolean[] fenced 1-based
-local function index(lines, attach, fmt)
+function M.index(lines, attach, fmt)
   local by_row = {}
   for _, ref in ipairs(parser.parse(lines, { attach = attach, mention_format = fmt })) do
     local row = ref.span.start_row
@@ -111,7 +111,7 @@ function M.convert(bufnr, to, regions)
   end
   local ctx = { attach = attach, mention_format = require("vergil.config").options.mention.format }
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-  local by_row, fenced = index(lines, attach, ctx.mention_format)
+  local by_row, fenced = M.index(lines, attach, ctx.mention_format)
   local edits = {} ---@type vergil.Edit[]
   for _, region in ipairs(regions) do
     local row, line = region.row, lines[region.row + 1]
@@ -125,7 +125,7 @@ function M.convert(bufnr, to, regions)
           edits[#edits + 1] = edit_for(ref, to, ctx, session.root)
         end
       end
-      for _, ref in ipairs(bare_refs(line, row, refs, region.first, region.last, ctx.mention_format)) do
+      for _, ref in ipairs(M.bare_refs(line, row, refs, region.first, region.last, ctx.mention_format)) do
         edits[#edits + 1] = edit_for(ref, to, ctx, session.root)
       end
     end
@@ -226,7 +226,7 @@ function M.jump(dir, count)
   end
   local fmt = require("vergil.config").options.mention.format
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-  local by_row, fenced = index(lines, require("vergil.agents").for_buffer(bufnr).attach, fmt)
+  local by_row, fenced = M.index(lines, require("vergil.agents").for_buffer(bufnr).attach, fmt)
   local row, col = unpack(vim.api.nvim_win_get_cursor(0))
   row = row - 1
   local found
@@ -235,7 +235,7 @@ function M.jump(dir, count)
     local r = row
     while r >= 0 and r < #lines and not found do
       if not fenced[r + 1] then
-        local refs = bare_refs(lines[r + 1], r, by_row[r] or {}, 0, #lines[r + 1], fmt)
+        local refs = M.bare_refs(lines[r + 1], r, by_row[r] or {}, 0, #lines[r + 1], fmt)
         local from, to, step = 1, #refs, 1
         if dir < 0 then
           from, to, step = #refs, 1, -1

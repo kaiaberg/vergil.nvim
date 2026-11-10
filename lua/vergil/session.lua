@@ -12,6 +12,7 @@ local M = {}
 ---@field root string
 ---@field agent string key of the buffer's agent under `agents`, or "plain"
 ---@field jump { row: integer, col: integer, abs: string }? reference last opened with `gd` or `:Vergil open` (0-based)
+---@field status vergil.Status? the latest prompt status (`vergil.status`)
 
 local sessions = {} ---@type table<integer, vergil.Session>
 --- The prompt file's bytes when vergil first saw it, for `:Vergil abort`.
@@ -120,6 +121,7 @@ function M.disable(bufnr)
   sessions[bufnr] = nil
   if vim.api.nvim_buf_is_valid(bufnr) then
     vim.b[bufnr].vergil_enabled = nil
+    require("vergil.status").clear(bufnr)
     require("vergil.lsp.client").detach(bufnr)
     require("vergil.range").detach(bufnr)
     require("vergil.keymaps").detach(bufnr)

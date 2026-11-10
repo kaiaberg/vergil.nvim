@@ -678,6 +678,34 @@ Lua API: `require("vergil")`
   `toggle()`, `preview()`, `open(how?, mods?)`
                           The actions behind the commands; they return
                           `ok, err`.
+  `status(bufnr?)`        The buffer's |vergil-status|, or nil.
+  `format_size(bytes)`    A size as vergil writes it: `512 B`, `1.5 KB`,
+                          `2.0 MB` (1 KB = 1024 bytes).
+
+                                         *vergil-status* *b:vergil_status*
+                                                              *VergilStatus*
+vergil draws no status line. It keeps numbers about the prompt in
+`b:vergil_status`, a table in prompt buffers only, and fires the |User|
+event `VergilStatus` after each update (`ev.data.bufnr`, `ev.data.status`),
+so lualine, heirline or your own 'statusline' or 'winbar' can show what
+you like. They're updated along with the diagnostics, after each change,
+so reading them costs nothing. The README has examples.
+
+  `agent`              The buffer's agent, by its name under `agents`
+  `attachments`        Distinct attached files and directories that exist
+  `attachment_bytes`   Their total size; directories count 0
+  `attachment_tokens`  Estimated tokens of those files
+  `mentions`           Mentions of existing files or directories, each one
+  `missing`            References whose file doesn't exist
+  `to_convert`         Bare paths |vergil-convert| would convert (`]f`)
+  `outside_root`       References to files outside the project root
+  `prompt_tokens`      Estimated tokens of the prompt text
+  `tokens`             `prompt_tokens` + `attachment_tokens`
+
+The token numbers are rough: a third of the bytes, the rule the
+large-attachment note uses. Agents count differently; use them to compare,
+not to predict. Field names are part of vergil's API: new ones may be
+added, existing ones only change in a major release.
 
 ==============================================================================
 14. LIMITATIONS                                           *vergil-limitations*
@@ -686,7 +714,8 @@ Lua API: `require("vergil")`
 - Only the short-lived `Ctrl+G` Neovim is supported.
 - vergil sees only the current prompt, not files attached earlier.
 - `@words` in pasted text may be reported as missing files (Info).
-- The large-attachment note is an estimate.
+- The large-attachment note and the |vergil-status| token numbers are
+  estimates.
 - Mentions with ranges are a convention Claude followed in testing; nothing
   enforces them.
 - Plugin skill discovery and synced-skill naming are best effort.

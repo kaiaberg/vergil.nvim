@@ -8,14 +8,7 @@ M.preview_lines = 20
 M.max_range_lines = 60
 M.max_dir_entries = 40
 
-local function human_size(n)
-  if n < 1024 then
-    return n .. " B"
-  elseif n < 1024 * 1024 then
-    return ("%.1f KB"):format(n / 1024)
-  end
-  return ("%.1f MB"):format(n / 1024 / 1024)
-end
+local human_size = require("vergil.size").format
 
 --- Reads lines `first..last` (1-based, inclusive), stopping at `last`.
 local function read_lines(abs, first, last)

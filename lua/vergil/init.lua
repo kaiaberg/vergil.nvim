@@ -36,6 +36,23 @@ function M.references(bufnr)
   return require("vergil.reference.parser").parse_buffer(bufnr or 0)
 end
 
+--- The prompt status of a buffer (see `:help vergil-status`), or nil when
+--- vergil isn't on there or hasn't checked the buffer yet.
+---@param bufnr integer?
+---@return vergil.Status?
+function M.status(bufnr)
+  bufnr = (bufnr == nil or bufnr == 0) and vim.api.nvim_get_current_buf() or bufnr
+  local s = require("vergil.session").get(bufnr)
+  return s and s.status
+end
+
+--- A size as vergil writes it: `512 B`, `1.5 KB`, `2.0 MB`.
+---@param bytes integer
+---@return string
+function M.format_size(bytes)
+  return require("vergil.size").format(bytes)
+end
+
 local function current_session()
   local s = require("vergil.session").get(vim.api.nvim_get_current_buf())
   if not s then

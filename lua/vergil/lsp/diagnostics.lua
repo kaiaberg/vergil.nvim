@@ -27,12 +27,7 @@ local SEVERITY = { error = 1, warn = 2, info = 3, hint = 4 }
 --- Diagnostic kinds that "Convert to mention" fixes.
 M.fixable = { duplicate = true, large = true, ignored_range = true }
 
-local function human_size(n)
-  if n < 1024 * 1024 then
-    return ("%.0f KB"):format(n / 1024)
-  end
-  return ("%.1f MB"):format(n / 1024 / 1024)
-end
+local human_size = require("vergil.size").format
 
 local symbol_cache = {} ---@type table<string, { stamp: string, list: vergil.Symbol[]|false }>
 
@@ -151,7 +146,7 @@ function M.compute(session)
       if not target.exists then
         add("missing_attachment", ref, ("Not found: %s"):format(target.abs))
       elseif target.type == "file" and target.size then
-        local tokens = math.floor(target.size / 3)
+        local tokens = require("vergil.size").tokens(target.size)
         if tokens > opts.attachment_token_warning then
           add(
             "large",

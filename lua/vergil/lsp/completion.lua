@@ -113,14 +113,7 @@ local function escape_snippet(text)
   return (text:gsub("[\\%$}]", "\\%0"))
 end
 
-local function human_size(n)
-  if n < 1024 then
-    return n .. " B"
-  elseif n < 1024 * 1024 then
-    return ("%.1f KB"):format(n / 1024)
-  end
-  return ("%.1f MB"):format(n / 1024 / 1024)
-end
+local human_size = require("vergil.size").format
 
 local function rank(list, query)
   if query == "" then

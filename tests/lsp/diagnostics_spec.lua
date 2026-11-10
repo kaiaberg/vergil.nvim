@@ -53,7 +53,7 @@ return {
   ["large attachment uses the token estimate"] = function()
     local d = diags({ "@big.txt" })
     h.eq(d[1].code, "large")
-    h.truthy(d[1].message:find("~23k tokens, 68 KB", 1, true), d[1].message)
+    h.truthy(d[1].message:find("~23k tokens, 68.4 KB", 1, true), d[1].message)
     h.truthy(d[1].message:find("may skip or cut", 1, true))
     h.eq(d[1].severity, S.INFO)
   end,
